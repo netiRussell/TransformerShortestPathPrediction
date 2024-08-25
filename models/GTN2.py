@@ -90,3 +90,74 @@ class FeedForwardBlock(nn.Module):
     # input: (batch, max_path_len, d_model) --> (batch, max_path_len, d_ff) --> (batch, max_path_len, d_model)
     # Formula from the paper
     return self.linear2(self.dropout(torch.relu(self.linear1(input))))
+
+
+# ! num_heads = h
+# MultiHeadAttentionBlock calculates relations between elements in a sequence
+# TODO: consider step softmax(...), in ... we calculate matrix that allows us to omit(mask) relations between some elements. Check if it is possible to write matrix that utilizes this omit-feature based on the given adjacency matrix. If it is possible, then implement one. This way, I would have a matrix that prevents jumping from node A to node B that is not directly connected to node A.
+  # https://www.youtube.com/watch?v=ISNdQcPhsts @ minute 29
+class MultiHeadAttentionBlock():
+  def __init__( self, d_model: int, num_heads: int, dropout: float ):
+    super().__init__()
+    self.d_model = d_model
+    self.num_heads = num_heads
+
+    # Floor division to get d_k = number of embedding values per head
+    assert d_model % num_heads == 0, "d_model is not divisible by num_heads"
+    self.d_k = d_model // num_heads
+
+    # Weights for finding q, k, v. 
+    # To find q/k/v with weights = pos_enc(embedding(input))*self.w_q/self.w_k/self.w_v
+    self.w_q = nn.Linear(d_model, d_model)
+    self.w_k = nn.Linear(d_model, d_model)
+    self.w_v = nn.Linear(d_model, d_model)
+
+    # Weights applied after concatination of all heads
+    self.w_o = nn.Linear(d_model, d_model)
+    self.dropout = nn.Dropout(dropout)
+  
+  @staticmethod # no need for an instance, can be called directly from MultiHeadAttentionBlock
+  def calcAttention( query, key, value, mask, dropout: nn.Dropout ):
+    d_k = query.shape[-1]
+
+    # Formula from the paper
+    attention_scores = (query @ key.transpose(-2, -1)) / math.sqrt(d_k)
+
+    # Apply mask to omit relations between certain nodes
+    if mask is not None:
+      # All corresponding values of mask that are equal 0 will be replaced by -1e9 in attention_scores
+      attention_scores.masked_fill_(mask == 0, -1e9)
+    
+    # Softmax
+    attention_scores = attention_scores.softmax(dim=-1)
+
+    # Dropout
+    if dropout is not None:
+      attention_scores = dropout(attention_scores)
+    
+    # Formula continues
+    return (attention_scores @ value), attention_scores
+
+  
+  def forward( self, q, k, v, mask=None ):
+    # q,k,v: (batch, path_len, d_model)
+    query = self.w_q(q)
+    key = self.w_k(k)
+    value = self.w_v(v)
+
+    # q,k,v: (batch, path_len, d_model) --> (batch, path_len, num_heads, d_k) --> (batch, num_heads, path_len, d_k)
+    query = query.view(query.shape[0], query.shape[1], self.num_heads, self.d_k).transpose(1, 2)
+    key = key.view(key.shape[0], key.shape[1], self.num_heads, self.d_k).transpose(1, 2)
+    value = value.view(value.shape[0], value.shape[1], self.num_heads, self.d_k).transpose(1, 2)
+
+    # Calculate attentions for each head
+    # output: (batch, num_heads, path_len, d_k)
+    output, self.attention_scores = MultiHeadAttentionBlock.calcAttention(query, key, value, mask, self.dropout)
+
+    # output: (batch, num_heads, path_len, d_k) --> (batch, path_len, num_heads, d_k)
+    output = output.transpose(1, 2).contiguous()
+
+    # output: (batch, path_len, num_heads, d_k) --> (batch, path_len, d_model)
+    output = output.view(output.shape[0], -1, self.num_heads * self.d_k)
+
+    return self.w_o(output)
