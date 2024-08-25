@@ -1,0 +1,6 @@
+data/raw
+data/processed
+data/__pycache__
+__pycache__
+savedGrads
+.DS_Store
