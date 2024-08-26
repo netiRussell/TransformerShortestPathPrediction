@@ -404,12 +404,17 @@ def transformer_builder( src_num_nodes: int, tgt_num_nodes: int, max_src_len: in
   # Transformer
   transformer = Transformer(gcn, encoder, decoder, src_embedding, tgt_embedding, src_posEnc, tgt_posEnc, projection_layer)
 
-  # Init parameters
+  # Resume parameters if continuing previous training
   if(resume):
-    print("Not implemented yet!")
+    checkpoint = torch.load('./savedGrads/checkpoint.pth.tar')
+    transformer.load_state_dict(checkpoint['model_state_dict'])
+
+    return checkpoint, transformer
+
+  # Init parameters if starting new training
   else:
     for p in transformer.parameters():
       if p.dim() > 1:
           nn.init.xavier_uniform_(p)
-  
-  return transformer
+
+    return None, transformer
