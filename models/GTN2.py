@@ -96,7 +96,7 @@ class FeedForwardBlock(nn.Module):
 # MultiHeadAttentionBlock calculates relations between elements in a sequence
 # TODO: consider step softmax(...), in ... we calculate matrix that allows us to omit(mask) relations between some elements. Check if it is possible to write matrix that utilizes this omit-feature based on the given adjacency matrix. If it is possible, then implement one. This way, I would have a matrix that prevents jumping from node A to node B that is not directly connected to node A.
   # https://www.youtube.com/watch?v=ISNdQcPhsts @ minute 29
-class MultiHeadAttentionBlock():
+class MultiHeadAttentionBlock(nn.Module):
   def __init__( self, d_model: int, num_heads: int, dropout: float ):
     super().__init__()
     self.d_model = d_model
@@ -137,7 +137,6 @@ class MultiHeadAttentionBlock():
     
     # Formula continues
     return (attention_scores @ value), attention_scores
-
   
   def forward( self, q, k, v, mask=None ):
     # q,k,v: (batch, path_len, d_model)
@@ -161,3 +160,106 @@ class MultiHeadAttentionBlock():
     output = output.view(output.shape[0], -1, self.num_heads * self.d_k)
 
     return self.w_o(output)
+  
+  
+# ! layer = sublayer
+# ResidualConnector - implements skip connection(with dropout) to keep track of progress and applies normalization layer
+class ResidualConnector(nn.Module):
+  def __init__( self, dropout: float ):
+    super().__init__()
+    self.dropout = nn.Dropout(dropout)
+    self.norm = Normalizator()
+  
+  def forward( self, input, layer ):
+
+    # Apply normalization and Calculate output from the layer which will be skipped
+    layer_output = layer( self.norm(input) )
+
+    # Add the skipped layer to the initial input
+    # ( Dropout is needed to avoid overfitting and getting stuck at local minima )
+    return input + self.dropout(layer_output)
+
+
+# Single Encoder block (Encoder can have up to 10 of them)
+class EncoderBlock(nn.Module):
+  def __init__( self, self_attention_block: MultiHeadAttentionBlock, feed_forward_block: FeedForwardBlock, dropout: float ):
+    super().__init__()
+    self.self_attention_block = self_attention_block
+    self.feed_forward_block = feed_forward_block
+    # nn.ModuleList = pyTorch way of initializing an array of nn.Module instances
+    self.resid_cons = nn.ModuleList([ResidualConnector(dropout), ResidualConnector(dropout)])
+  
+  def forward( self, input, src_mask):
+    # Self Attentions
+    output = self.resid_cons[0](input, lambda input: self.self_attention_block(input, input, input, src_mask))
+
+    # Feed Forward
+    return self.resid_cons[1](output, self.feed_forward_block)
+
+
+# -- Encoder --
+class Encoder(nn.Module):
+  def __init__( self, layers: nn.ModuleList):
+    super().__init__()
+    self.layers = layers
+    self.norm = Normalizator()
+  
+  def forward( self, input, mask ):
+    current_output = input
+
+    # Sequentially send input through every given EncoderBlock with the same mask
+    for layer in self.layers:
+      current_output = layer(current_output, mask)
+    
+    # Normalize final output
+    return self.norm(current_output)
+
+
+# Single Decoder block
+class DecoderBlock(nn.Module):
+  def __init__( self, self_attention_block: MultiHeadAttentionBlock, cross_attention_block: MultiHeadAttentionBlock, feed_forward_block: FeedForwardBlock, dropout: float ):
+    super().__init__()
+    self.self_attention_block = self_attention_block
+    self.cross_attention_block = cross_attention_block
+    self.feed_forward_block = feed_forward_block
+    self.resid_cons = nn.ModuleList([ResidualConnector(dropout), ResidualConnector(dropout), ResidualConnector(dropout)])
+  
+  def forward( self, tgt_input, encoder_output, src_mask, tgt_mask):
+    # Self Attentions for the tgt_input; with target mask
+    tgt_output = self.resid_cons[0](tgt_input, lambda tgt_input: self.self_attention_block( tgt_input, tgt_input, tgt_input, tgt_mask ))
+
+    # Cross Attentions for values, keys as Encoder output and queries as the decoder block output; with source mask
+    tgt_output = self.resid_cons[1](tgt_output, lambda tgt_output: self.cross_attention_block( tgt_output, encoder_output, encoder_output, src_mask ))
+
+    # Feed Forward
+    return self.resid_cons[2](tgt_output, self.feed_forward_block)
+
+
+# -- Decoder --
+class Decoder(nn.Module):
+  def __init__( self, layers: nn.ModuleList):
+    super().__init__()
+    self.layers = layers
+    self.norm = Normalizator()
+  
+  def forward( self, tgt_input, encoder_output, src_mask, tgt_mask ):
+    current_tgt_output = tgt_input
+
+    # Sequentially send input through every given DecoderBlock with the same mask
+    for layer in self.layers:
+      current_tgt_output = layer(current_tgt_output, encoder_output, src_mask, tgt_mask)
+    
+    # Normalize final output
+    return self.norm(current_tgt_output)
+
+
+# ! num_nodes = vocab_size
+# -- Projection layer: projects embeddings into the nodes --
+class ProjectionLayer(nn.Module):
+  def __init__( self, d_model: int, num_nodes: int ):
+    super().__init__()
+    self.proj = nn.Linear(d_model, num_nodes)
+  
+  def forward( self, input ):
+    # input: (batch, path_len, d_model) --> (batch, path_len, num_nodes)
+    return self.proj(input)
