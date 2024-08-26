@@ -73,7 +73,7 @@ for epoch in range(n_epochs):
     temp_losses = []
     
     loss = None
-    for i in range(len(batch)):
+    for i in range(batch_size):
       # One sample
       x = batch[i].x.permute(1,0)
       y = torch.cat(( batch[i].y.permute(1,0), torch.tensor([[len(batch[i].x)]]) ), 1) # labels + eos
@@ -119,7 +119,7 @@ with torch.no_grad():
 
   for id_batch, batch in enumerate(validLoader):
     
-    for i in range(len(batch)):
+    for i in range(batch_size):
       x = batch[i].x.permute(1,0)
       y = torch.cat(( batch[i].y.permute(1,0), torch.tensor([[len(batch[i].x)]]) ), 1) # labels + eos
       y_flag = batch[i].imperfect_y_flag.item()

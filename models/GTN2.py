@@ -3,10 +3,72 @@
 
 import torch
 import torch.nn as nn
+import torch.nn.functional as F
+from torch_geometric.nn import GCN2Conv
 
 import math
 
 # TODO: delete all (!) after done with development
+# Must be in eval mode to work properly after training.
+
+# Custom Sigmoid for final GCN output to fit transformer
+class CustomSigmoid(nn.Module):
+  def __init__(self):
+    super(CustomSigmoid, self).__init__()
+
+  def forward(self, x, beta=1):
+    return len(x)*torch.sigmoid(x)
+
+
+# -- GCN layer --
+class GCNs(nn.Module):
+  def __init__( self, dropout: int ):
+    super().__init__()
+    # num GCN layers = sqrt(n_nodes) - 1
+    self.gcn1 = GCN2Conv(1, 0.3)
+    self.gcn2 = GCN2Conv(1, 0.3)
+    self.gcn3 = GCN2Conv(1, 0.3)
+    self.gcn4 = GCN2Conv(1, 0.3)
+    self.gcn5 = GCN2Conv(1, 0.3)
+    self.gcn6 = GCN2Conv(1, 0.3)
+    self.gcn7 = GCN2Conv(1, 0.3)
+    self.gcn8 = GCN2Conv(1, 0.3)
+    self.gcn9 = GCN2Conv(1, 0.3)
+
+    self.dropout = nn.Dropout(dropout)
+    self.sigmoidNumNod = CustomSigmoid()
+  
+  def forward( self, input, adj ):
+    x_0 = input[0].unsqueeze(-1).float()
+
+    out = self.gcn1(x_0, x_0, adj)
+    out = self.dropout(out)
+
+    out = F.leaky_relu(self.gcn2(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn3(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn4(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = torch.sigmoid((self.gcn5(out, x_0, adj)))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn6(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn7(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn8(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = self.sigmoidNumNod(self.gcn9(out, x_0, adj))
+    out = out.squeeze(1).unsqueeze(0).long()
+
+    return out
 
 # ! node_size = vocab_size
 # InputEmbedder class takes in a sequenece and returns embedded values - vectors of d_model dimension
@@ -195,7 +257,7 @@ class EncoderBlock(nn.Module):
 
     # Feed Forward
     return self.resid_cons[1](output, self.feed_forward_block)
-
+  
 
 # -- Encoder --
 class Encoder(nn.Module):
@@ -255,6 +317,7 @@ class Decoder(nn.Module):
 
 # ! num_nodes = vocab_size
 # -- Projection layer: projects embeddings into the nodes --
+# TODO: consider setting num_nodes to 4 as we have only 4 options where to go after each step
 class ProjectionLayer(nn.Module):
   def __init__( self, d_model: int, num_nodes: int ):
     super().__init__()
@@ -263,3 +326,90 @@ class ProjectionLayer(nn.Module):
   def forward( self, input ):
     # input: (batch, path_len, d_model) --> (batch, path_len, num_nodes)
     return self.proj(input)
+
+
+# -- Transformer --
+class Transformer(nn.Module):
+  def __init__( self, gcn: GCNs, encoder: Encoder, decoder: Decoder, src_embedding: InputEmbedder, tgt_embedding: InputEmbedder, src_pos: PoistionalEncoder, tgt_pos: PoistionalEncoder, projection_layer: ProjectionLayer ):
+    super().__init__()
+    self.encoder = encoder
+    self.decoder = decoder
+    self.src_embedding = src_embedding
+    self.tgt_embedding = tgt_embedding
+    self.src_pos: src_pos
+    self.tgt_pos = tgt_pos
+    self.projection_layer = projection_layer
+  
+  def encode( self, src_input, edge_index, src_mask ):
+    # GCN2 applied
+    out = self.gcn(src_input, edge_index)
+
+    # Calculating embeddings for GCN output (encoder input); then adding them to positional encodings 
+    out = self.src_embedding(out)
+    out = self.src_pos(out)
+
+    # Ecnoder forward pass
+    return self.encoder(out, src_mask)
+
+  def decode( self, encoder_output, src_mask, tgt_input, tgt_mask ):
+    # Calculating embeddings for predicted path(decoder input); then adding them to positional encodings 
+    out = self.tgt_embedding(tgt_input)
+    out = self.src_pos(out)
+
+    # Decoder forward pass
+    return self.decoder(out, encoder_output, src_mask, tgt_mask)
+  
+  def project( self, input ):
+    # Final linear NN
+    return self.projection_layer(input)
+
+
+# -- Function to build a Transformer --
+def transformer_builder( src_num_nodes: int, tgt_num_nodes: int, max_src_len: int, max_tgt_len: int, d_model: int=512, num_encoderBlocks: int=6, num_attnHeads: int=8, dropout: float=0.1, d_ff: int=2048, resume: bool=False  ) -> Transformer:
+  # GCN layer
+  gcn = GCNs(dropout)
+
+  # Embedding layers
+  src_embedding = InputEmbedder(d_model, src_num_nodes)
+  tgt_embedding = InputEmbedder(d_model, tgt_num_nodes)
+
+  # Positional Encoding layers
+  src_posEnc = PoistionalEncoder(d_model, max_src_len, dropout)
+  tgt_posEnc = PoistionalEncoder(d_model, max_tgt_len, dropout)
+
+  # Encoder
+  encoder_blocks = nn.ModuleList()
+
+  for _ in range(num_encoderBlocks):
+    self_attention = MultiHeadAttentionBlock(d_model, num_attnHeads, dropout)
+    feed_forward_block = FeedForwardBlock(d_model, d_ff, dropout)
+    encoder_blocks.append( EncoderBlock(self_attention, feed_forward_block, dropout) )
+  
+  encoder = Encoder(encoder_blocks)
+
+  # Decoder
+  decoder_blocks = nn.ModuleList()
+
+  for _ in range(num_encoderBlocks):
+    self_attention = MultiHeadAttentionBlock(d_model, num_attnHeads, dropout)
+    cross_attention = MultiHeadAttentionBlock(d_model, num_attnHeads, dropout)
+    feed_forward_block = FeedForwardBlock(d_model, d_ff, dropout)
+    decoder_blocks.append( DecoderBlock(self_attention, cross_attention, feed_forward_block, dropout) )
+  
+  decoder = Decoder(decoder_blocks)
+
+  # Projection Layer
+  projection_layer = ProjectionLayer(d_model, tgt_num_nodes)
+
+  # Transformer
+  transformer = Transformer(gcn, encoder, decoder, src_embedding, tgt_embedding, src_posEnc, tgt_posEnc, projection_layer)
+
+  # Init parameters
+  if(resume):
+    print("Not implemented yet!")
+  else:
+    for p in transformer.parameters():
+      if p.dim() > 1:
+          nn.init.xavier_uniform_(p)
+  
+  return transformer

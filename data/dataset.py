@@ -16,8 +16,8 @@ class PredictShortestPathDataset(Dataset):
   @property
   def processed_file_names(self):
     self.df = pd.read_csv(self.raw_paths[0])
-    #return ['data_{}.pt'.format(i) for i in range(len(self.df)) ]
-    return 'none.pt'
+    return ['data_{}.pt'.format(i) for i in range(len(self.df)) ]
+    #return 'none.pt'
 
   def download(self):
       pass
