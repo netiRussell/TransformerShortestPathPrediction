@@ -8,6 +8,8 @@ from torch_geometric.nn import GCN2Conv
 
 import math
 
+import sys # TODO: delete after done with development
+
 # TODO: delete all (!) after done with development
 # Must be in eval mode to work properly after training.
 
@@ -66,9 +68,7 @@ class GCNs(nn.Module):
     out = self.dropout(out)
 
     out = self.sigmoidNumNod(self.gcn9(out, x_0, adj))
-    print(out)
-    out = out.squeeze(1).unsqueeze(0).long()
-    print(out)
+    out = out.squeeze(1).long()
 
     return out
 
@@ -78,11 +78,15 @@ class InputEmbedder(nn.Module):
   def __init__( self, d_model: int, num_nodes: int ):
     super().__init__()
     self.d_model = d_model
-    self.num_nodes = num_nodes
-    self.embeddingLayer = nn.Embedding(num_nodes, d_model)
+    self.num_nodes = num_nodes+1 # + 1 for EOS
+    self.embeddingLayer = nn.Embedding(self.num_nodes, d_model)
   
   def forward( self, input ):
-    # input: (batch, max_path_len) --> (batch, max_path_len, d_model)
+    # input: (max_path_len) --> (max_path_len, d_model)
+
+    # Add positions for EOS in input
+    input = torch.cat((input, torch.tensor([self.num_nodes-1]))) # EOS ( 100 nodes, then EOS = 100 )
+
     return self.embeddingLayer(input) * math.sqrt(self.d_model)
 
 
@@ -93,7 +97,7 @@ class PoistionalEncoder(nn.Module):
     super().__init__()
     self.d_model = d_model
     self.max_path_len = max_path_len
-    self.dropoutLayer = nn.Dropout(dropout)
+    self.dropout = nn.Dropout(dropout)
 
     # Matrix of shape (max_path_len, d_model) to cover all embedding vectors
     pos_enc = torch.zeros(max_path_len, d_model, requires_grad=False)
@@ -110,14 +114,11 @@ class PoistionalEncoder(nn.Module):
     # Apply cos to odd positions (every vector, every odd value from embedding vector)
     pos_enc[:, 1::2] = torch.cos(position * div_term)
 
-    # Modify pos_enc shape to suit the mini-batch training pattern
-    pos_enc = pos_enc.unsqueeze(0) # (1, max_path_len, d_model)
-
     # Cache the positional encodings, so that it is retrievable via model.state_dict()
     self.register_buffer('pos_enc', pos_enc)
   
   def forward( self, input ):
-    input = input + self.pos_enc[:, :input.shape[1], :]
+    input = input + self.pos_enc[ :input.shape[1], :]
     return self.dropout(input)
 
 
@@ -340,7 +341,7 @@ class Transformer(nn.Module):
     self.decoder = decoder
     self.src_embedding = src_embedding
     self.tgt_embedding = tgt_embedding
-    self.src_pos: src_pos
+    self.src_pos = src_pos
     self.tgt_pos = tgt_pos
     self.projection_layer = projection_layer
   
@@ -358,7 +359,7 @@ class Transformer(nn.Module):
   def decode( self, encoder_output, src_mask, tgt_input, tgt_mask ):
     # Calculating embeddings for predicted path(decoder input); then adding them to positional encodings 
     out = self.tgt_embedding(tgt_input)
-    out = self.src_pos(out)
+    out = self.tgt_pos(out)
 
     # Decoder forward pass
     return self.decoder(out, encoder_output, src_mask, tgt_mask)

@@ -49,7 +49,7 @@ visualizeGraph(dataset, num_nodes=100, run=False)
 
 # max_src_len - max path length for source including EOS to start and end with
 # max_tgt_len - max path length for tgt including EOS to start with
-checkpoint, model = transformer_builder( src_num_nodes=config['num_nodes'], tgt_num_nodes=config['num_nodes'], max_src_len=config['num_nodes']+2, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False )
+checkpoint, model = transformer_builder( src_num_nodes=config['num_nodes'], tgt_num_nodes=config['num_nodes'], max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False )
 model.to(device)
 
 optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], eps=1e-9)
