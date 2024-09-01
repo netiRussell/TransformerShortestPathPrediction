@@ -64,8 +64,9 @@ model.train()
 # mask relations between nodes that are not neighbors
 encoder_mask = None # (Batch, 1, 1, Seq_Len)
 
-# mask tokens (Batch, 1, Seq_Len, Seq_Len)
-decoder_mask = torch.triu(torch.ones(1, config['num_nodes']+1, config['num_nodes']+1), diagonal=1).type(torch.int) == 0 #(1, Seq_Len, Seq_Len)
+# mask tokens
+decoder_mask = None # (Batch, 1, Seq_Len, Seq_Len)
+#decoder_mask = torch.triu(torch.ones(1, config['num_nodes']+1, config['num_nodes']+1), diagonal=1).type(torch.int) == 0 #(1, Seq_Len, Seq_Len)
 
 for epoch in range(config['num_epochs']):
   for batch_index, batch in enumerate(trainLoader):

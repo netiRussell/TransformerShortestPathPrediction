@@ -39,7 +39,7 @@ class GCNs(nn.Module):
     self.sigmoidNumNod = CustomSigmoid()
   
   def forward( self, input, adj ):
-    x_0 = input[0].unsqueeze(-1).float()
+    x_0 = input.float()
 
     out = self.gcn1(x_0, x_0, adj)
     out = self.dropout(out)
@@ -66,7 +66,9 @@ class GCNs(nn.Module):
     out = self.dropout(out)
 
     out = self.sigmoidNumNod(self.gcn9(out, x_0, adj))
+    print(out)
     out = out.squeeze(1).unsqueeze(0).long()
+    print(out)
 
     return out
 
@@ -332,6 +334,8 @@ class ProjectionLayer(nn.Module):
 class Transformer(nn.Module):
   def __init__( self, gcn: GCNs, encoder: Encoder, decoder: Decoder, src_embedding: InputEmbedder, tgt_embedding: InputEmbedder, src_pos: PoistionalEncoder, tgt_pos: PoistionalEncoder, projection_layer: ProjectionLayer ):
     super().__init__()
+    torch.manual_seed(1234567) # TODO: delete after dev phase is done
+    self.gcn = gcn
     self.encoder = encoder
     self.decoder = decoder
     self.src_embedding = src_embedding
