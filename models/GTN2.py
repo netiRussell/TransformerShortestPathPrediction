@@ -118,7 +118,7 @@ class PoistionalEncoder(nn.Module):
     self.register_buffer('pos_enc', pos_enc)
   
   def forward( self, input ):
-    input = input + self.pos_enc[ :input.shape[1], :]
+    input = input + self.pos_enc[ :input.shape[0], :]
     return self.dropout(input)
 
 
@@ -209,20 +209,20 @@ class MultiHeadAttentionBlock(nn.Module):
     key = self.w_k(k)
     value = self.w_v(v)
 
-    # q,k,v: (batch, path_len, d_model) --> (batch, path_len, num_heads, d_k) --> (batch, num_heads, path_len, d_k)
-    query = query.view(query.shape[0], query.shape[1], self.num_heads, self.d_k).transpose(1, 2)
-    key = key.view(key.shape[0], key.shape[1], self.num_heads, self.d_k).transpose(1, 2)
-    value = value.view(value.shape[0], value.shape[1], self.num_heads, self.d_k).transpose(1, 2)
+    # q,k,v: (path_len, d_model) --> (path_len, num_heads, d_k) --> (num_heads, path_len, d_k)
+    query = query.view(query.shape[0], self.num_heads, self.d_k).transpose(0, 1)
+    key = key.view(key.shape[0], self.num_heads, self.d_k).transpose(0, 1)
+    value = value.view( value.shape[0], self.num_heads, self.d_k).transpose(0, 1)
 
     # Calculate attentions for each head
-    # output: (batch, num_heads, path_len, d_k)
+    # output: ( num_heads, path_len, d_k)
     output, self.attention_scores = MultiHeadAttentionBlock.calcAttention(query, key, value, mask, self.dropout)
 
-    # output: (batch, num_heads, path_len, d_k) --> (batch, path_len, num_heads, d_k)
-    output = output.transpose(1, 2).contiguous()
+    # output: (num_heads, path_len, d_k) --> (path_len, num_heads, d_k)
+    output = output.transpose(0, 1).contiguous()
 
-    # output: (batch, path_len, num_heads, d_k) --> (batch, path_len, d_model)
-    output = output.view(output.shape[0], -1, self.num_heads * self.d_k)
+    # output: (path_len, num_heads, d_k) --> (path_len, d_model)
+    output = output.view(output.shape[0], self.num_heads * self.d_k)
 
     return self.w_o(output)
   
@@ -357,7 +357,9 @@ class Transformer(nn.Module):
     return self.encoder(out, src_mask)
 
   def decode( self, encoder_output, src_mask, tgt_input, tgt_mask ):
-    # Calculating embeddings for predicted path(decoder input); then adding them to positional encodings 
+    # Calculating embeddings for predicted path(decoder input); then adding them to positional encodings
+    
+    # TODO: implement teacher forcing
     out = self.tgt_embedding(tgt_input)
     out = self.tgt_pos(out)
 

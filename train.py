@@ -86,6 +86,9 @@ for epoch in range(config['num_epochs']):
       encoder_output = model.encode( encoder_input, adj_input, src_mask=encoder_mask )
       decoder_output = model.decode( encoder_output, encoder_mask, decoder_input, decoder_mask )
       proj_output = model.project( decoder_output )
+
+      print(encoder_input.shape, proj_output.shape)
+      sys.exit("__")
       
       # Loss, to be deleted after the model is trained
       loss = criterion(proj_output, decoder_input)
