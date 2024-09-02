@@ -62,6 +62,17 @@ optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], eps=1e-9)
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
 
 
+# -- Load model & optimizer --
+if ( False ):
+  checkpoint = torch.load('./savedGrads/checkpoint.pth.tar')
+  model.load_state_dict(checkpoint['model_state_dict'])
+  optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
+  total_epochs = checkpoint['total_epochs']
+  prevConfig = checkpoint['prevConfig']
+
+  print(f'Training is resumed! Starting from epoch #{prev_n_epochs}')
+
+
 # -- Training Loop --
 model.train()
 losses = list()
@@ -105,7 +116,6 @@ for epoch in range(config['num_epochs']):
       
       # Backpropagation
       loss.backward()
-      break
     
     # Update weights after every batch
     optimizer.step()
@@ -116,8 +126,18 @@ for epoch in range(config['num_epochs']):
 
     print(f"Epoch: {epoch+1}, Batch: {batch_index}, Loss: {avg_batch_loss}")
 
-    break
-  break
+
+# -- Save progress of training --
+if('total_epochs' in locals()):
+  config['num_epochs'] += total_epochs
+
+save_checkpoint({
+            'model_state_dict': model.state_dict(),
+            'optimizer_state_dict': optimizer.state_dict(),
+            'total_epochs': config['num_epochs'],
+            'prevConfig': config
+            })
+print(f'The model has been saved at {config['num_epochs']} epochs')
 
 
 # -- Visualization of loss curve --

@@ -2,5 +2,5 @@ data/raw
 data/processed
 data/__pycache__
 __pycache__
-savedGrads
+savedGrads/checkpoint.pth.tar
 .DS_Store
