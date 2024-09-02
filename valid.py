@@ -59,13 +59,13 @@ criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
 
 
 # -- Training Loop --
-model.train()
+model.eval()
 
 # mask relations between nodes that are not neighbors
 encoder_mask = None # (1, Seq_Len)
 
 for epoch in range(config['num_epochs']):
-  for batch_index, batch in enumerate(trainLoader):
+  for batch_index, batch in enumerate(validLoader):
     optimizer.zero_grad()
     
     for i in range(config['batch_size']):
@@ -73,19 +73,13 @@ for epoch in range(config['num_epochs']):
       encoder_input = batch[i].x.to(device) # (Batch, Seq_Length)
       # Edge Index list
       adj_input = batch[i].edge_index.to(device)
-      
-      # TODO: undesrtand what is decoder_input in the source code
-      # y, to be deleted after the model is trained
-      decoder_input = batch[i].y.to(device) # (Batch, Seq_Length)
 
-      # TODO: create forward method for the model
+      print(encoder_input)
+    
       encoder_output = model.encode( encoder_input, adj_input, encoder_mask )
-      decoder_output = model.decode( encoder_output, encoder_mask, decoder_input, config['num_nodes']+1, training_mode=True )
+      decoder_output = model.decode( encoder_output, encoder_mask, None, config['num_nodes']+1, training_mode=False )
 
-      sys.exit("_")
-      proj_output = model.project( decoder_output )
-
-      print(encoder_input.shape, proj_output.shape)
+      print(decoder_output, len(decoder_output))
       sys.exit("__")
       
       # Loss, to be deleted after the model is trained

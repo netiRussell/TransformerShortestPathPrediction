@@ -83,10 +83,6 @@ class InputEmbedder(nn.Module):
   
   def forward( self, input ):
     # input: (max_path_len) --> (max_path_len, d_model)
-
-    # Add positions for EOS in input
-    input = torch.cat((input, torch.tensor([self.num_nodes-1]))) # EOS ( 100 nodes, then EOS = 100 )
-
     return self.embeddingLayer(input) * math.sqrt(self.d_model)
 
 
@@ -356,15 +352,57 @@ class Transformer(nn.Module):
     # Ecnoder forward pass
     return self.encoder(out, src_mask)
 
-  def decode( self, encoder_output, src_mask, tgt_input, tgt_mask ):
-    # Calculating embeddings for predicted path(decoder input); then adding them to positional encodings
-    
-    # TODO: implement teacher forcing
-    out = self.tgt_embedding(tgt_input)
-    out = self.tgt_pos(out)
+  def decode( self, encoder_output, src_mask, tgt_input, max_path_len, training_mode ):
 
-    # Decoder forward pass
-    return self.decoder(out, encoder_output, src_mask, tgt_mask)
+    # Add EOS to the beginning of the sequence
+    eos = max_path_len-1
+    if(training_mode == True):
+      tgt_input = torch.cat((torch.tensor([eos]), tgt_input))
+    else:
+      tgt_input = torch.tensor([eos])
+
+    tmp_mask = None
+    finalOut = torch.tensor([])
+
+    print(tgt_input, tgt_input.shape)
+
+    # Loop
+    for step in range(1, max_path_len):
+      print("mask size: ", step)
+
+      # Calculating embeddings for predicted path(decoder input); then adding them to positional encodings
+      # TODO: consider applying masks to embedding layer as well
+      out = self.tgt_embedding(tgt_input)
+      out = self.tgt_pos(out)
+
+      # Generate a mask, to be deleted after training is done
+      if(training_mode == True):
+        tmp_mask = torch.zeros((len(tgt_input), len(tgt_input)))
+        tmp_mask[:step, :step] = 1
+
+      # Decoder forward pass
+      out = self.decoder(out, encoder_output, src_mask, tmp_mask)
+      out = self.project(out)
+      nextNode = torch.argmax(out[step-1])
+
+      # Append next node to the final list of steps predicted
+      finalOut = torch.cat((finalOut, out[step-1].unsqueeze(0)))
+
+      if(training_mode == True):
+        # Teacher Forcing, to be deleted after training
+        if(step == len(tgt_input) - 1):
+          print(finalOut, finalOut.shape)
+          return finalOut
+      else:
+        # Update decoder input
+        tgt_input = torch.cat((tgt_input, nextNode.unsqueeze(0)))
+        
+      
+      # If EOS is reached => end of sequence => end the loop.
+      if( nextNode == eos and training_mode == False ):
+        return finalOut
+
+    return finalOut
   
   def project( self, input ):
     # Final linear NN
@@ -406,7 +444,7 @@ def transformer_builder( src_num_nodes: int, tgt_num_nodes: int, max_src_len: in
   decoder = Decoder(decoder_blocks)
 
   # Projection Layer
-  projection_layer = ProjectionLayer(d_model, tgt_num_nodes)
+  projection_layer = ProjectionLayer(d_model, max_tgt_len)
 
   # Transformer
   transformer = Transformer(gcn, encoder, decoder, src_embedding, tgt_embedding, src_posEnc, tgt_posEnc, projection_layer)
