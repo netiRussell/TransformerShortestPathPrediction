@@ -78,9 +78,9 @@ for epoch in range(config['num_epochs']):
       # y, to be deleted after the model is trained
       decoder_input = batch[i].y.to(device) # (Batch, Seq_Length)
 
-      # TODO: create forward method for the model
-      encoder_output = model.encode( encoder_input, adj_input, encoder_mask )
-      decoder_output = model.decode( encoder_output, encoder_mask, decoder_input, config['num_nodes']+1, training_mode=True )
+      # Generate prediction
+      prediction = model( encoder_input, decoder_input, adj_input, encoder_mask, config['num_nodes']+1, training_mode=True )
+      print(prediction, prediction.shape)
 
       sys.exit("_")
       proj_output = model.project( decoder_output )

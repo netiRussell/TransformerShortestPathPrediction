@@ -74,12 +74,10 @@ for epoch in range(config['num_epochs']):
       # Edge Index list
       adj_input = batch[i].edge_index.to(device)
 
-      print(encoder_input)
-    
-      encoder_output = model.encode( encoder_input, adj_input, encoder_mask )
-      decoder_output = model.decode( encoder_output, encoder_mask, None, config['num_nodes']+1, training_mode=False )
+      # Generate prediction
+      prediction = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1 )
+      print(prediction, prediction.shape)
 
-      print(decoder_output, len(decoder_output))
       sys.exit("__")
       
       # Loss, to be deleted after the model is trained

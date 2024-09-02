@@ -408,6 +408,11 @@ class Transformer(nn.Module):
     # Final linear NN
     return self.projection_layer(input)
 
+  def forward( self, encoder_input, decoder_input, adj_input, encoder_mask, max_path_len, training_mode=False ):
+    encoder_output = self.encode( encoder_input, adj_input, encoder_mask )
+    decoder_output = self.decode( encoder_output, encoder_mask, decoder_input, max_path_len, training_mode )
+    return decoder_output
+
 
 # -- Function to build a Transformer --
 def transformer_builder( src_num_nodes: int, tgt_num_nodes: int, max_src_len: int, max_tgt_len: int, d_model: int=512, num_encoderBlocks: int=6, num_attnHeads: int=8, dropout: float=0.1, d_ff: int=2048, resume: bool=False  ) -> Transformer:
