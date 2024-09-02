@@ -9,15 +9,19 @@ from functions import prepare_data, save_checkpoint
 import sys # TODO: delete after done with development
 
 # TODO: Training dataset is too small and doesn’t cover all the optimal paths
+# TODO: Try to run the model. Record outcome
+
 # TODO: For the linear part after decoder before softmax, change dimensions of linear NN to 4.
-
 # TODO: Try to run the model. Record outcome
 
-#TODO: Apply masks in encoder based on the adjacency matrix to avoid jumping from nodes that are not connected
-
+# TODO: Apply masks in encoder based on the adjacency matrix to avoid jumping from nodes that are not connected
 # TODO: Try to run the model. Record outcome
 
-# TODO: Compare results of batch_size = 20 and = 100. Record outcome
+# TODO: Implement dynamic learning rate
+# TODO: Try to run the model. Record outcome
+
+# TODO: Compare results of batch_size = 20 and = 100.
+# TODO: Try to run the model. Record outcome
 
 # -- Device --
 device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
@@ -86,8 +90,8 @@ for epoch in range(config['num_epochs']):
       # y_flag (represents whether a sample is not an optimal path), to be deleted after the model is trained
       y_flag = batch[i].imperfect_y_flag.item()
 
-      # Generate prediction
-      prediction = model( encoder_input, decoder_input, adj_input, encoder_mask, config['num_nodes']+1, training_mode=True )
+      # Generate prediction (we're interested in probs, not the steps)
+      _, prediction = model( encoder_input, decoder_input, adj_input, encoder_mask, config['num_nodes']+1, training_mode=True )
       
       # Loss, to be deleted after the model is trained
       loss = criterion(prediction.contiguous(), decoder_input.contiguous())
@@ -101,6 +105,7 @@ for epoch in range(config['num_epochs']):
       
       # Backpropagation
       loss.backward()
+      break
     
     # Update weights after every batch
     optimizer.step()
@@ -108,7 +113,6 @@ for epoch in range(config['num_epochs']):
     # Save average loss of the batch
     avg_batch_loss = (sum(temp_losses) / len(temp_losses))
     losses.append(avg_batch_loss)
-    print(temp_losses)
 
     print(f"Epoch: {epoch+1}, Batch: {batch_index}, Loss: {avg_batch_loss}")
 
@@ -116,4 +120,51 @@ for epoch in range(config['num_epochs']):
   break
 
 
-# TODO: implement evaluation
+# -- Visualization of loss curve --
+visualizeLoss(losses, run=True)
+
+
+# -- Evaluation --
+model.eval()
+
+with torch.no_grad():
+  success_rate = []
+  complete_success_rate = []
+
+  for batch_index, batch in enumerate(validLoader):
+    for i in range(config['batch_size']):
+      # Imperfect sample; to be disregarded
+      if( y_flag == 1 ):
+        continue
+      
+      # X
+      encoder_input = batch[i].x.to(device)
+      # Edge Index list
+      adj_input = batch[i].edge_index.to(device)
+      # y
+      label = batch[i].y.to(device)
+
+      # Generate prediction (we're interested in steps, not the probs)
+      prediction, _ = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1 )
+
+      # Check if the length of the output is correct
+      if(len(label) != len(prediction)):
+        success_rate.append(0)
+        complete_success_rate.append(0)
+        continue
+      
+      # Compare elements from output and label
+      points = 0
+
+      for i, elem in enumerate(prediction):
+        if(torch.argmax(elem) == label[i]):
+          points += 1
+
+      # len(label) is never 0
+      success_rate.append(points / len(label))
+      complete_success_rate.append(int(points / len(label)))
+    
+    print(f"Evaluation is in the process... Current batch = {batch_index}")
+
+  print(f"Success percentage (length is correct but not all elements must be the same): {(sum(success_rate) / len(success_rate)) * 100 }%")
+  print(f"Complete success percentage (length and all elements are correct): {(sum(complete_success_rate) / len(complete_success_rate)) * 100 }%")

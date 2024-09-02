@@ -331,7 +331,7 @@ class ProjectionLayer(nn.Module):
 class Transformer(nn.Module):
   def __init__( self, gcn: GCNs, encoder: Encoder, decoder: Decoder, src_embedding: InputEmbedder, tgt_embedding: InputEmbedder, src_pos: PoistionalEncoder, tgt_pos: PoistionalEncoder, projection_layer: ProjectionLayer ):
     super().__init__()
-    torch.manual_seed(1234567) # TODO: delete after dev phase is done
+    # torch.manual_seed(1234567) # TODO: delete after dev phase is done
     self.gcn = gcn
     self.encoder = encoder
     self.decoder = decoder
@@ -368,7 +368,7 @@ class Transformer(nn.Module):
     for step in range(1, max_path_len):
 
       # Calculating embeddings for predicted path(decoder input); then adding them to positional encodings
-      # TODO: consider applying masks to embedding layer as well
+      # TODO: consider applying masks to embedding layer during training as well
       out = self.tgt_embedding(tgt_input)
       out = self.tgt_pos(out)
 
@@ -388,7 +388,7 @@ class Transformer(nn.Module):
       if(training_mode == True):
         # Teacher Forcing, to be deleted after training
         if(step == len(tgt_input) - 1):
-          return finalOut
+          return tgt_input, finalOut
       else:
         # Update decoder input
         tgt_input = torch.cat((tgt_input, nextNode.unsqueeze(0)))
@@ -396,9 +396,13 @@ class Transformer(nn.Module):
       
       # If EOS is reached => end of sequence => end the loop.
       if( nextNode == eos and training_mode == False ):
-        return finalOut
+        # Delete EOS from the beginning and the end of the prediction
+        tgt_input = tgt_input[1:-1]
+        return tgt_input, finalOut
 
-    return finalOut
+    # Delete EOS from the beginning the prediction
+    tgt_input = tgt_input[1:]
+    return tgt_input, finalOut
   
   def project( self, input ):
     # Final linear NN
