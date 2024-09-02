@@ -60,39 +60,57 @@ criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
 
 # -- Training Loop --
 model.train()
+losses = list()
 
 # mask relations between nodes that are not neighbors
 encoder_mask = None # (1, Seq_Len)
 
 for epoch in range(config['num_epochs']):
+  # One epoch
   for batch_index, batch in enumerate(trainLoader):
+    # One batch
     optimizer.zero_grad()
+    temp_losses = list()
     
     for i in range(config['batch_size']):
+      # One sample
+      
       # X
-      encoder_input = batch[i].x.to(device) # (Batch, Seq_Length)
+      encoder_input = batch[i].x.to(device)
       # Edge Index list
       adj_input = batch[i].edge_index.to(device)
       
       # TODO: undesrtand what is decoder_input in the source code
       # y, to be deleted after the model is trained
-      decoder_input = batch[i].y.to(device) # (Batch, Seq_Length)
+      decoder_input = batch[i].y.to(device)
+      # y_flag (represents whether a sample is not an optimal path), to be deleted after the model is trained
+      y_flag = batch[i].imperfect_y_flag.item()
 
       # Generate prediction
       prediction = model( encoder_input, decoder_input, adj_input, encoder_mask, config['num_nodes']+1, training_mode=True )
-      print(prediction, prediction.shape)
-
-      sys.exit("_")
-      proj_output = model.project( decoder_output )
-
-      print(encoder_input.shape, proj_output.shape)
-      sys.exit("__")
       
       # Loss, to be deleted after the model is trained
-      loss = criterion(proj_output, decoder_input)
+      loss = criterion(prediction.contiguous(), decoder_input.contiguous())
+
+      # Save loss
+      temp_losses.append(loss.item())
+
+      # Imperfect sample case
+      if(y_flag == 1):
+        loss = 0.15*loss
+      
+      # Backpropagation
       loss.backward()
     
+    # Update weights after every batch
     optimizer.step()
+    
+    # Save average loss of the batch
+    avg_batch_loss = (sum(temp_losses) / len(temp_losses))
+    losses.append(avg_batch_loss)
+    print(temp_losses)
+
+    print(f"Epoch: {epoch+1}, Batch: {batch_index}, Loss: {avg_batch_loss}")
 
     break
   break

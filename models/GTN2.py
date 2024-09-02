@@ -364,11 +364,8 @@ class Transformer(nn.Module):
     tmp_mask = None
     finalOut = torch.tensor([])
 
-    print(tgt_input, tgt_input.shape)
-
     # Loop
     for step in range(1, max_path_len):
-      print("mask size: ", step)
 
       # Calculating embeddings for predicted path(decoder input); then adding them to positional encodings
       # TODO: consider applying masks to embedding layer as well
@@ -391,7 +388,6 @@ class Transformer(nn.Module):
       if(training_mode == True):
         # Teacher Forcing, to be deleted after training
         if(step == len(tgt_input) - 1):
-          print(finalOut, finalOut.shape)
           return finalOut
       else:
         # Update decoder input
