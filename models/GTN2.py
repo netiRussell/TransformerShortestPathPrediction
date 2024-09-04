@@ -388,6 +388,9 @@ class Transformer(nn.Module):
       if(training_mode == True):
         # Teacher Forcing, to be deleted after training
         if(step == len(tgt_input)):
+          # Delete EOS from the beginning the prediction
+          tgt_input = tgt_input[1:]
+          
           return tgt_input, finalOut
       else:
         # Update decoder input

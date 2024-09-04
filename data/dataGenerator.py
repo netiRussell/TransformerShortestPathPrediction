@@ -87,11 +87,6 @@ def get_optimal_paths(adj: List[List[int]], n: int, start: int, end: int) -> Non
 
     return paths
 
-# TODO: implement this logic in csv files generation
-    # TODO: generate the regular perfect.csv where each sample is independent even if X is the same
-    # TODO: generate eval.csv where all samples with the same X are grouped up in a single row
-        # eval.csv will be used during evaluation to allow the model to choose optimal paths
-
 
 def generate_dataset( num_nodes, imperfect=False):
     if(math.sqrt(num_nodes) % 1):

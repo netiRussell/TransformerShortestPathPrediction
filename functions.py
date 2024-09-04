@@ -30,3 +30,22 @@ def save_checkpoint(state, path='./savedGrads/checkpoint.pth.tar'):
         os.remove(path)
     
     torch.save(state, path)
+
+
+def is_correct(X, edge_list, path):
+    source = (X == 5).nonzero(as_tuple=True)[0].item()
+    destination = (X == 10).nonzero(as_tuple=True)[0].item()
+    path = path.tolist()
+
+    if( path[0] != source or path[-1] != destination ):
+        return False
+    
+    # Convert edge_list to a set for better perfomance
+    edge_set = set(zip(edge_list[0].tolist(), edge_list[1].tolist()))
+    
+    # Check if each consecutive pair in the path exists in the edge set
+    for i in range(len(path) - 1):
+        if (path[i], path[i + 1]) not in edge_set and (path[i + 1], path[i]) not in edge_set:
+            return False
+    
+    return True

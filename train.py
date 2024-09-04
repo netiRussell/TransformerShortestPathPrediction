@@ -4,7 +4,7 @@ from models.GTN2 import transformer_builder
 
 from visualization import visualizeGraph, visualizeLoss
 from data.dataset import PredictShortestPathDataset
-from functions import prepare_data, save_checkpoint
+from functions import prepare_data, save_checkpoint, is_correct
 
 
 import sys # TODO: delete after done with development
@@ -12,16 +12,16 @@ import sys # TODO: delete after done with development
 # TODO: Training dataset is too small and doesn’t cover all the optimal paths
 # TODO: Try to run the model. Record outcome
 
-# TODO: For the linear part after decoder before softmax, change dimensions of linear NN to 4.
-# TODO: Try to run the model. Record outcome
-
-# TODO: Apply masks in encoder based on the adjacency matrix to avoid jumping from nodes that are not connected
+# TODO: Apply masks(no self loop, only connections with neighbors) in encoder based on the adjacency matrix to avoid jumping from nodes that are not connected
 # TODO: Try to run the model. Record outcome
 
 # TODO: Implement dynamic learning rate
 # TODO: Try to run the model. Record outcome
 
-# TODO: Compare results of batch_size = 20 and = 100.
+# TODO: Compare results of batch_size = 20 and = 100. Try different hyperparameters
+# TODO: Try to run the model. Record outcome
+
+# TODO: For the linear part after decoder before softmax, change dimensions of linear NN to 4.
 # TODO: Try to run the model. Record outcome
 
 # -- Device --
@@ -43,7 +43,7 @@ config = {
 dataset = PredictShortestPathDataset(root="./data")
 total_samples = len(dataset)
 
-trainLoader, validLoader = prepare_data( dataset=dataset, batch_size=config['batch_size'], valid_percantage=0.3)
+trainLoader, validLoader = prepare_data( dataset=dataset, batch_size=config['batch_size'], valid_percantage=0.1)
 
 
 # -- Visualize a single data sample --
@@ -71,7 +71,7 @@ if ( False ):
   total_epochs = checkpoint['total_epochs']
   prevConfig = checkpoint['prevConfig']
 
-  print(f'Training is resumed! Starting from epoch #{prev_n_epochs}')
+  print(f'Training is resumed! Starting from epoch #{total_epochs}')
 
 
 # -- Training Loop --
@@ -154,7 +154,6 @@ visualizeLoss(losses, run=True)
 model.eval()
 
 with torch.no_grad():
-  success_rate = []
   complete_success_rate = []
 
   for batch_index, batch in enumerate(validLoader):
@@ -175,22 +174,14 @@ with torch.no_grad():
 
       # Check if the length of the output is correct
       if(len(label) != len(prediction)):
-        success_rate.append(0)
         complete_success_rate.append(0)
         continue
+
+      print("Current prediction reviewed: ", prediction)
       
-      # Compare elements from output and label
-      points = 0
-
-      for i, elem in enumerate(prediction):
-        if(torch.argmax(elem) == label[i]):
-          points += 1
-
-      # len(label) is never 0
-      success_rate.append(points / len(label))
-      complete_success_rate.append(int(points / len(label)))
+      # Check if all the nodes are correct and src and dist are correct
+      complete_success_rate.append( is_correct(encoder_input, adj_input, prediction) )
     
     print(f"Evaluation is in the process... Current batch = {batch_index}")
 
-  print(f"Success percentage (length is correct but not all elements must be the same): {(sum(success_rate) / len(success_rate)) * 100 }%")
   print(f"Complete success percentage (length and all elements are correct): {(sum(complete_success_rate) / len(complete_success_rate)) * 100 }%")
