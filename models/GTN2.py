@@ -352,17 +352,17 @@ class Transformer(nn.Module):
     # Ecnoder forward pass
     return self.encoder(out, src_mask)
 
-  def decode( self, encoder_output, src_mask, tgt_input, max_path_len, training_mode ):
+  def decode( self, encoder_output, src_mask, tgt_input, max_path_len, training_mode, device ):
 
     # Add EOS to the beginning of the sequence
     eos = max_path_len-1
     if(training_mode == True):
-      tgt_input = torch.cat((torch.tensor([eos]), tgt_input))
+      tgt_input = torch.cat((torch.tensor([eos]).to(device), tgt_input))
     else:
-      tgt_input = torch.tensor([eos])
+      tgt_input = torch.tensor([eos]).to(device)
 
     tmp_mask = None
-    finalOut = torch.tensor([])
+    finalOut = torch.tensor([]).to(device)
 
     # Loop
     for step in range(1, max_path_len):
@@ -374,20 +374,20 @@ class Transformer(nn.Module):
 
       # Generate a mask, to be deleted after training is done
       if(training_mode == True):
-        tmp_mask = torch.zeros((len(tgt_input), len(tgt_input)))
+        tmp_mask = torch.zeros((len(tgt_input), len(tgt_input))).to(device)
         tmp_mask[:step, :step] = 1
 
       # Decoder forward pass
       out = self.decoder(out, encoder_output, src_mask, tmp_mask)
       out = self.project(out)
-      nextNode = torch.argmax(out[step-1])
+      nextNode = torch.argmax(out[step-1]).to(device)
 
       # Append next node to the final list of steps predicted
       finalOut = torch.cat((finalOut, out[step-1].unsqueeze(0)))
 
       if(training_mode == True):
         # Teacher Forcing, to be deleted after training
-        if(step == len(tgt_input) - 1):
+        if(step == len(tgt_input)):
           return tgt_input, finalOut
       else:
         # Update decoder input
@@ -408,9 +408,9 @@ class Transformer(nn.Module):
     # Final linear NN
     return self.projection_layer(input)
 
-  def forward( self, encoder_input, decoder_input, adj_input, encoder_mask, max_path_len, training_mode=False ):
+  def forward( self, encoder_input, decoder_input, adj_input, encoder_mask, max_path_len, device, training_mode=False ):
     encoder_output = self.encode( encoder_input, adj_input, encoder_mask )
-    decoder_output = self.decode( encoder_output, encoder_mask, decoder_input, max_path_len, training_mode )
+    decoder_output = self.decode( encoder_output, encoder_mask, decoder_input, max_path_len, training_mode, device )
     return decoder_output
 
 

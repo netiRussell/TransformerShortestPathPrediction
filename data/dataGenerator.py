@@ -87,91 +87,12 @@ def get_optimal_paths(adj: List[List[int]], n: int, start: int, end: int) -> Non
 
     return paths
 
-def add_edge(adj: List[List[int]],
-             src: int, dest: int) -> None:
-    adj[src].append(dest)
-    adj[dest].append(src)
-
-
-# Create a graph
-
-adj = [[10, 1], [0, 11, 2], [1, 12, 3], [2, 13, 4], [3, 14, 5], [4, 15, 6], [5, 16, 7], [6, 17, 8], [7, 18, 9], [8, 19], [0, 20, 11], [1, 10, 21, 12], [2, 11, 22, 13], [3, 12, 23, 14], [4, 13, 24, 15], [5, 14, 25, 16], [6, 15, 26, 17], [7, 16, 27, 18], [8, 17, 28, 19], [9, 18, 29], [10, 30, 21], [11, 20, 31, 22], [12, 21, 32, 23], [13, 22, 33, 24], [14, 23, 34, 25], [15, 24, 35, 26], [16, 25, 36, 27], [17, 26, 37, 28], [18, 27, 38, 29], [19, 28, 39], [20, 40, 31], [21, 30, 41, 32], [22, 31, 42, 33], [23, 32, 43, 34], [24, 33, 44, 35], [25, 34, 45, 36], [26, 35, 46, 37], [27, 36, 47, 38], [28, 37, 48, 39], [29, 38, 49], [30, 50, 41], [31, 40, 51, 42], [32, 41, 52, 43], [33, 42, 53, 44], [34, 43, 54, 45], [35, 44, 55, 46], [36, 45, 56, 47], [37, 46, 57, 48], [38, 47, 58, 49], [39, 48, 59], [40, 60, 51], [41, 50, 61, 52], [42, 51, 62, 53], [43, 52, 63, 54], [44, 53, 64, 55], [45, 54, 65, 56], [46, 55, 66, 57], [47, 56, 67, 58], [48, 57, 68, 59], [49, 58, 69], [50, 70, 61], [51, 60, 71, 62], [52, 61, 72, 63], [53, 62, 73, 64], [54, 63, 74, 65], [55, 64, 75, 66], [56, 65, 76, 67], [57, 66, 77, 68], [58, 67, 78, 69], [59, 68, 79], [60, 80, 71], [61, 70, 81, 72], [62, 71, 82, 73], [63, 72, 83, 74], [64, 73, 84, 75], [65, 74, 85, 76], [66, 75, 86, 77], [67, 76, 87, 78], [68, 77, 88, 79], [69, 78, 89], [70, 90, 81], [71, 80, 91, 82], [72, 81, 92, 83], [73, 82, 93, 84], [74, 83, 94, 85], [75, 84, 95, 86], [76, 85, 96, 87], [77, 86, 97, 88], [78, 87, 98, 89], [79, 88, 99], [80, 91], [81, 90, 92], [82, 91, 93], [83, 92, 94], [84, 93, 95], [85, 94, 96], [86, 95, 97], [87, 96, 98], [88, 97, 99], [89, 98]]
-
-# Given source and destination
-src = 0
-dest = 12
-
-# Function Call
-print(get_optimal_paths(adj, 100, src, dest))
-
-sys.exit("still in development phase...")
-
-
 # TODO: implement this logic in csv files generation
     # TODO: generate the regular perfect.csv where each sample is independent even if X is the same
     # TODO: generate eval.csv where all samples with the same X are grouped up in a single row
         # eval.csv will be used during evaluation to allow the model to choose optimal paths
 
 
-# Algorithm for finding the optimal path
-def bfs(adjacency_matrix, S, par, dist):
-  # Preparing graph by convertin long tesnor into int list 
-  graph = adjacency_matrix
-
-  # Queue to store the nodes in the order they are visited
-  q = deque()
-  # Mark the distance of the source node as 0
-  dist[S] = 0
-  # Push the source node to the queue
-  q.append(S)
-
-  # Iterate until the queue is not empty
-  while q:
-      # Pop the node at the front of the queue
-      node = q.popleft()
-
-      # Explore all the neighbors of the current node
-      for neighbor in graph[node]:
-          # Check if the neighboring node is not visited
-          if dist[neighbor] == float('inf'):
-              # Mark the current node as the parent of the neighboring node
-              par[neighbor] = node
-              # Mark the distance of the neighboring node as the distance of the current node + 1
-              dist[neighbor] = dist[node] + 1
-              # Insert the neighboring node to the queue
-              q.append(neighbor)
-    
-  return dist
-
-
-def get_shortest_distance(adjacency_matrix, S, D, V):
-  # par[] array stores the parent of nodes
-  par = [-1] * V
-
-  # dist[] array stores the distance of nodes from S
-  dist = [float('inf')] * V
-
-  # Function call to find the distance of all nodes and their parent nodes
-  dist = bfs(adjacency_matrix, S, par, dist)
-
-  if dist[D] == float('inf'):
-      print("Source and Destination are not connected")
-      return
-
-  # List path stores the shortest path
-  path = []
-  current_node = D
-  path.append(D)
-  while par[current_node] != -1:
-      path.append(par[current_node])
-      current_node = par[current_node]
-
-  # Printing path from source to destination
-  return path
-
-
-
-# -----------------------------------------------------------------------------------
 def generate_dataset( num_nodes, imperfect=False):
     if(math.sqrt(num_nodes) % 1):
         exit(f"Number of nodes = {num_nodes} can't form a grid layout")
@@ -228,14 +149,20 @@ def generate_dataset( num_nodes, imperfect=False):
             # Generating random source and destination nodes
             source = row_id
             destination = column_id
+
+            # X = nx1 size list of values of each node
+            X = [[0]] * num_nodes
+            X[source] = [5]
+            X[destination] = [10]
             
             if( imperfect ):
+                sys.exit("Is not adapted to multiple optimal paths") # Utilize dataset.append([edge_index, X, Y]) at the end
                 # Find optimal path and sometimes longer path
                 if( random.random() < 0.05):
                     # Randomly longer path
                     in_between_node = random.randint(0, num_nodes-1)
-                    path = get_shortest_distance(graph, source, in_between_node, num_nodes)[::-1]
-                    path.extend(get_shortest_distance(graph, in_between_node, destination, num_nodes)[::-1][1:])
+                    path = get_optimal_paths(graph, num_nodes, source, in_between_node,)[::-1]
+                    path.extend(get_optimal_paths(graph, num_nodes, in_between_node, destination)[::-1][1:])
 
                     # Y = nodes to go to to reach destination. Minimum size: 1
                     # path is reversed to follow s->d route
@@ -243,7 +170,7 @@ def generate_dataset( num_nodes, imperfect=False):
                     n_imperfect_samples += 1
                 else:
                     # Optimal path
-                    path = get_shortest_distance(graph, source, destination, num_nodes)
+                    path = get_optimal_paths(graph, num_nodes, source, destination)
 
                     # Y = nodes to go to to reach destination. Minimum size: 1
                     # path is reversed to follow s->d route
@@ -251,18 +178,17 @@ def generate_dataset( num_nodes, imperfect=False):
 
             else:
                 # Find optimal path
-                path = get_shortest_distance(graph, source, destination, num_nodes)
+                paths = get_optimal_paths(graph, num_nodes, source, destination)
 
-                # Y = nodes to go to to reach destination. Minimum size: 1
-                # path is reversed to follow s->d route
-                Y = [path[::-1],[0]]
+                for path in paths:
+                    # Y = nodes to go to to reach destination. Minimum size: 1
+                    # path is reversed to follow s->d route
+                    Y = [path,[0]]
+
+                    # Add the path to the csv file
+                    dataset.append([edge_index, X, Y])
             
-            # X = nx1 size list of values of each node
-            X = [[0]] * num_nodes
-            X[source] = [5]
-            X[destination] = [10]
             
-            dataset.append([edge_index, X, Y])
 
     return dataset, n_imperfect_samples
 

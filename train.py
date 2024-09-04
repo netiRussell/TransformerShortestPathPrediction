@@ -6,6 +6,7 @@ from visualization import visualizeGraph, visualizeLoss
 from data.dataset import PredictShortestPathDataset
 from functions import prepare_data, save_checkpoint
 
+
 import sys # TODO: delete after done with development
 
 # TODO: Training dataset is too small and doesn’t cover all the optimal paths
@@ -31,7 +32,7 @@ print(f'Chosen device for training: {device}')
 # -- Config --
 config = {
   "batch_size": 50,
-  "num_epochs": 6,
+  "num_epochs": 8,
   # TODO: start with bigger one and gradually go down to 10**-4 or some other small number
   "lr": 10**-4,
   "num_nodes": 100
@@ -102,10 +103,13 @@ for epoch in range(config['num_epochs']):
       y_flag = batch[i].imperfect_y_flag.item()
 
       # Generate prediction (we're interested in probs, not the steps)
-      _, prediction = model( encoder_input, decoder_input, adj_input, encoder_mask, config['num_nodes']+1, training_mode=True )
+      _, prediction = model( encoder_input, decoder_input, adj_input, encoder_mask, config['num_nodes']+1, device, training_mode=True )
+
+      # Add EOS to the end of the current label(y)
+      decoder_input = torch.cat( (decoder_input, torch.tensor([config['num_nodes']]).to(device)) )
       
       # Loss, to be deleted after the model is trained
-      loss = criterion(prediction.contiguous(), decoder_input.contiguous())
+      loss = criterion(prediction.contiguous(), decoder_input.contiguous()).to(device)
 
       # Save loss
       temp_losses.append(loss.item())
@@ -131,13 +135,15 @@ for epoch in range(config['num_epochs']):
 if('total_epochs' in locals()):
   config['num_epochs'] += total_epochs
 
+num_epochs = config['num_epochs']
+
 save_checkpoint({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
             'total_epochs': config['num_epochs'],
             'prevConfig': config
             })
-print(f'The model has been saved at {config['num_epochs']} epochs')
+print(f'The model has been saved at {num_epochs} epochs')
 
 
 # -- Visualization of loss curve --
@@ -165,7 +171,7 @@ with torch.no_grad():
       label = batch[i].y.to(device)
 
       # Generate prediction (we're interested in steps, not the probs)
-      prediction, _ = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1 )
+      prediction, _ = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1, device)
 
       # Check if the length of the output is correct
       if(len(label) != len(prediction)):
