@@ -80,11 +80,11 @@ model.train()
 losses = list()
 
 # Getting universal edge index
-edge_index_sample = next(iter(trainLoader))[0].edge_index
-edge_set = set(zip(edge_index_sample[0].tolist(), edge_index_sample[1].tolist()))
+edge_index_sample = next(iter(trainLoader))[0].edge_index.to(device)
+edge_set_sample = set(zip(edge_index_sample[0].tolist(), edge_index_sample[1].tolist()))
 
 # Encoder mask
-encoder_mask = generate_enc_mas(num_nodes=config['num_nodes'], edge_set=edge_set).to(device)
+encoder_mask = generate_enc_mas(num_nodes=config['num_nodes'], edge_set=edge_set_sample).to(device)
 
 for epoch in range(config['num_epochs']):
   # One epoch
@@ -99,7 +99,7 @@ for epoch in range(config['num_epochs']):
       # X
       encoder_input = batch[i].x.to(device)
       # Edge Index list
-      adj_input = batch[i].edge_index.to(device)
+      adj_input = edge_index_sample
       
       # TODO: undesrtand what is decoder_input in the source code
       # y, to be deleted after the model is trained
@@ -170,7 +170,7 @@ with torch.no_grad():
       # X
       encoder_input = batch[i].x.to(device)
       # Edge Index list
-      adj_input = batch[i].edge_index.to(device)
+      adj_input = edge_index_sample
       # y
       label = batch[i].y.to(device)
 
@@ -184,9 +184,8 @@ with torch.no_grad():
 
       print("Current prediction reviewed: ", prediction)
       
-      # TODO: no need to redo the same edge_list
       # Check if all the nodes are correct and src and dest are correct
-      complete_success_rate.append( is_correct(encoder_input, adj_input, prediction) )
+      complete_success_rate.append( is_correct(encoder_input, edge_set_sample, prediction) )
     
     print(f"Evaluation is in the process... Current batch = {batch_index}")
 
