@@ -175,6 +175,11 @@ def generate_dataset( num_nodes, imperfect=False):
                 # Find optimal path
                 paths = get_optimal_paths(graph, num_nodes, source, destination)
 
+                # Keep one path per one pair of coordinates
+                Y = [paths[0],[0]]
+                dataset.append([edge_index, X, Y])
+                continue
+
                 for path in paths:
                     # Y = nodes to go to to reach destination. Minimum size: 1
                     # path is reversed to follow s->d route

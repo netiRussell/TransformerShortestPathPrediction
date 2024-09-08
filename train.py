@@ -4,7 +4,7 @@ from models.GTN2 import transformer_builder
 
 from visualization import visualizeGraph, visualizeLoss
 from data.dataset import PredictShortestPathDataset
-from functions import prepare_data, save_checkpoint, is_correct
+from functions import prepare_data, save_checkpoint, is_correct, generate_enc_mas
 
 
 import sys # TODO: delete after done with development
@@ -33,7 +33,7 @@ print(f'Chosen device for training: {device}')
 # -- Config --
 config = {
   "batch_size": 50,
-  "num_epochs": 8,
+  "num_epochs": 6,
   # TODO: start with bigger one and gradually go down to 10**-4 or some other small number
   "lr": 10**-4,
   "num_nodes": 100
@@ -79,8 +79,12 @@ if ( False ):
 model.train()
 losses = list()
 
-# mask relations between nodes that are not neighbors
-encoder_mask = None # (1, Seq_Len)
+# Getting universal edge index
+edge_index_sample = next(iter(trainLoader))[0].edge_index
+edge_set = set(zip(edge_index_sample[0].tolist(), edge_index_sample[1].tolist()))
+
+# Encoder mask
+encoder_mask = generate_enc_mas(num_nodes=config['num_nodes'], edge_set=edge_set).to(device)
 
 for epoch in range(config['num_epochs']):
   # One epoch

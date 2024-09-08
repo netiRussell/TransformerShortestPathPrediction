@@ -58,3 +58,19 @@ def is_correct(X, edge_list, path):
             return 0
     
     return 1
+
+
+def generate_enc_mas(num_nodes, edge_set):
+    tmp_mask = torch.zeros((100, 100))
+
+    # Check if each consecutive pair in the path exists in the edge set
+    for consideredNode in range(tmp_mask.shape[0]):
+        # Self loop case
+        tmp_mask[consideredNode][consideredNode] = 1
+        
+        # All other connections
+        for otherNode in range(tmp_mask.shape[0]):
+            if (consideredNode, otherNode) in edge_set:
+                tmp_mask[consideredNode][otherNode] = 1
+    
+    return tmp_mask
