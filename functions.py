@@ -33,12 +33,21 @@ def save_checkpoint(state, path='./savedGrads/checkpoint.pth.tar'):
 
 
 def is_correct(X, edge_list, path):
-    source = (X == 5).nonzero(as_tuple=True)[0].item()
+    source = (X == 5).nonzero(as_tuple=True)[0]
     destination = (X == 10).nonzero(as_tuple=True)[0].item()
     path = path.tolist()
 
+    # Self-loop => no source case:
+    if( len(source) == 0 ):
+        if(path[-1] == destination and len(path) == 1):
+            return 1
+        else:
+            return 0
+    
+    source = source.item()
+
     if( path[0] != source or path[-1] != destination ):
-        return False
+        return 0
     
     # Convert edge_list to a set for better perfomance
     edge_set = set(zip(edge_list[0].tolist(), edge_list[1].tolist()))
@@ -46,6 +55,6 @@ def is_correct(X, edge_list, path):
     # Check if each consecutive pair in the path exists in the edge set
     for i in range(len(path) - 1):
         if (path[i], path[i + 1]) not in edge_set and (path[i + 1], path[i]) not in edge_set:
-            return False
+            return 0
     
-    return True
+    return 1

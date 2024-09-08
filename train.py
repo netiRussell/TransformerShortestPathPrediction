@@ -9,13 +9,14 @@ from functions import prepare_data, save_checkpoint, is_correct
 
 import sys # TODO: delete after done with development
 
-# TODO: Training dataset is too small and doesn’t cover all the optimal paths
-# TODO: Try to run the model. Record outcome
-
+# TODO: Take X out, so that its computed and prepared only once.
 # TODO: Apply masks(no self loop, only connections with neighbors) in encoder based on the adjacency matrix to avoid jumping from nodes that are not connected
 # TODO: Try to run the model. Record outcome
 
 # TODO: Implement dynamic learning rate
+# TODO: Try to run the model. Record outcome
+
+# TODO: Training dataset is too small and doesn’t cover all the optimal paths
 # TODO: Try to run the model. Record outcome
 
 # TODO: Compare results of batch_size = 20 and = 100. Try different hyperparameters
@@ -179,7 +180,8 @@ with torch.no_grad():
 
       print("Current prediction reviewed: ", prediction)
       
-      # Check if all the nodes are correct and src and dist are correct
+      # TODO: no need to redo the same edge_list
+      # Check if all the nodes are correct and src and dest are correct
       complete_success_rate.append( is_correct(encoder_input, adj_input, prediction) )
     
     print(f"Evaluation is in the process... Current batch = {batch_index}")
