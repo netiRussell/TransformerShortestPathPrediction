@@ -44,7 +44,7 @@ config = {
 dataset = PredictShortestPathDataset(root="./data")
 total_samples = len(dataset)
 
-trainLoader, validLoader = prepare_data( dataset=dataset, batch_size=config['batch_size'], valid_percantage=0.1)
+trainLoader, validLoader = prepare_data( dataset=dataset, batch_size=config['batch_size'], valid_percantage=0.4)
 
 
 # -- Visualize a single data sample --

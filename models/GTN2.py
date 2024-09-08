@@ -188,7 +188,7 @@ class MultiHeadAttentionBlock(nn.Module):
     if mask is not None:
       # All corresponding values of mask that are equal 0 will be replaced by -1e9 in attention_scores
       attention_scores.masked_fill_(mask == 0, -1e9)
-    
+      
     # Softmax
     attention_scores = attention_scores.softmax(dim=-1)
 
@@ -285,9 +285,21 @@ class DecoderBlock(nn.Module):
     self.feed_forward_block = feed_forward_block
     self.resid_cons = nn.ModuleList([ResidualConnector(dropout), ResidualConnector(dropout), ResidualConnector(dropout)])
   
-  def forward( self, tgt_input, encoder_output, src_mask, tgt_mask):
+  def forward( self, tgt_input, encoder_output, src_mask, training_step, training_mode):
+    # Check if is in the training mode
+    if training_mode is True:
+      # Make sure tgt_input(the label) is masked during the cross attentions part as well
+      tgt_input = tgt_input[:training_step, :]
+
     # Self Attentions for the tgt_input; with target mask
-    tgt_output = self.resid_cons[0](tgt_input, lambda tgt_input: self.self_attention_block( tgt_input, tgt_input, tgt_input, tgt_mask ))
+    tgt_output = self.resid_cons[0](tgt_input, lambda tgt_input: self.self_attention_block( tgt_input, tgt_input, tgt_input, None ))
+
+    # TODO: tgt_input must be masked to be applied one by one and not as whole right way during the training
+    # TODO: Cross Attentions must use a specific mask that would provide values from src_mask that correspond each index from the tgt_input
+
+    # Prepare mask for the Cross Attentions
+    src_mask = src_mask[:tgt_output.shape[0], :]
+    # print(attention_scores, attention_scores.shape)
 
     # Cross Attentions for values, keys as Encoder output and queries as the decoder block output; with source mask
     tgt_output = self.resid_cons[1](tgt_output, lambda tgt_output: self.cross_attention_block( tgt_output, encoder_output, encoder_output, src_mask ))
@@ -303,12 +315,12 @@ class Decoder(nn.Module):
     self.layers = layers
     self.norm = Normalizator()
   
-  def forward( self, tgt_input, encoder_output, src_mask, tgt_mask ):
+  def forward( self, tgt_input, encoder_output, src_mask, training_step, training_mode ):
     current_tgt_output = tgt_input
 
     # Sequentially send input through every given DecoderBlock with the same mask
     for layer in self.layers:
-      current_tgt_output = layer(current_tgt_output, encoder_output, src_mask, tgt_mask)
+      current_tgt_output = layer(current_tgt_output, encoder_output, src_mask, training_step, training_mode)
     
     # Normalize final output
     return self.norm(current_tgt_output)
@@ -372,13 +384,8 @@ class Transformer(nn.Module):
       out = self.tgt_embedding(tgt_input)
       out = self.tgt_pos(out)
 
-      # Generate a mask, to be deleted after training is done
-      if(training_mode == True):
-        tmp_mask = torch.zeros((len(tgt_input), len(tgt_input))).to(device)
-        tmp_mask[:step, :step] = 1
-
       # Decoder forward pass
-      out = self.decoder(out, encoder_output, src_mask, tmp_mask)
+      out = self.decoder(out, encoder_output, src_mask, step, training_mode)
       out = self.project(out)
       nextNode = torch.argmax(out[step-1]).to(device)
 
