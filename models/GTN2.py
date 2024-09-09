@@ -294,15 +294,27 @@ class DecoderBlock(nn.Module):
     # Self Attentions for the tgt_input; with target mask
     tgt_output = self.resid_cons[0](tgt_input, lambda tgt_input: self.self_attention_block( tgt_input, tgt_input, tgt_input, None ))
 
-    # TODO: tgt_input must be masked to be applied one by one and not as whole right way during the training
     # TODO: Cross Attentions must use a specific mask that would provide values from src_mask that correspond each index from the tgt_input
+    # TODO: For decoder and cross attention masks - include EOS. All elems except the last one must not have access to EOS. Cross attentions is the same one as src_mask but with corresponding values (eg. node 2 must have values from src_mask[2][:] applied), also keep EOS open to every element.
 
     # Prepare mask for the Cross Attentions
-    src_mask = src_mask[:tgt_output.shape[0], :]
-    # print(attention_scores, attention_scores.shape)
+    # cross_mask = src_mask[:tgt_output.shape[0], :]
+    cross_mask = None
+    print(tgt_output.shape)
+    
+    """
+      Cross-attentions
+      1) Get access to current tgt_input
+      2) Get indexes from each of tgt_input
+      3) Apply corresponding values to each corresponding index
+    """
+
+    sys.exit("_")
 
     # Cross Attentions for values, keys as Encoder output and queries as the decoder block output; with source mask
-    tgt_output = self.resid_cons[1](tgt_output, lambda tgt_output: self.cross_attention_block( tgt_output, encoder_output, encoder_output, src_mask ))
+    tgt_output = self.resid_cons[1](tgt_output, lambda tgt_output: self.cross_attention_block( tgt_output, encoder_output, encoder_output, cross_mask ))
+
+    sys.exit("_")
 
     # Feed Forward
     return self.resid_cons[2](tgt_output, self.feed_forward_block)

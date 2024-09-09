@@ -183,6 +183,7 @@ with torch.no_grad():
         continue
 
       print("Current prediction reviewed: ", prediction)
+      print("Correct answer: ", label)
       
       # Check if all the nodes are correct and src and dest are correct
       complete_success_rate.append( is_correct(encoder_input, edge_set_sample, prediction) )
