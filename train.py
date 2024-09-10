@@ -9,20 +9,22 @@ from functions import prepare_data, save_checkpoint, is_correct, generate_enc_ma
 
 import sys # TODO: delete after done with development
 
-# TODO: Take X out, so that its computed and prepared only once.
-# TODO: Apply masks(no self loop, only connections with neighbors) in encoder based on the adjacency matrix to avoid jumping from nodes that are not connected
-# TODO: Try to run the model. Record outcome
+# TODO: Implement cross-attention mask based on the encoder mask
+# TODO: Try to retrain the model. Record outcome
 
 # TODO: Implement dynamic learning rate
+# TODO: Try to retrain the model. Record outcome
+
+# TODO: Compare results of batch_size = 20 and = 100. Try different hyperparameters !
+# TODO: Try to retrain the model. Record outcome
+
+# TODO: Post-training Q/A refining(find incorrect answers and use loss function with optimizer to nodge the weights)
+# TODO: Try to eval the model. Record outcome
+
+# TODO: MAYBE: Training dataset is too small and doesn’t cover all the optimal paths
 # TODO: Try to run the model. Record outcome
 
-# TODO: Training dataset is too small and doesn’t cover all the optimal paths
-# TODO: Try to run the model. Record outcome
-
-# TODO: Compare results of batch_size = 20 and = 100. Try different hyperparameters
-# TODO: Try to run the model. Record outcome
-
-# TODO: For the linear part after decoder before softmax, change dimensions of linear NN to 4.
+# TODO: MAYBE: For the linear part after decoder before softmax, change dimensions of linear NN to 4.
 # TODO: Try to run the model. Record outcome
 
 # -- Device --
