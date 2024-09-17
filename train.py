@@ -1,10 +1,13 @@
 import torch
 import torch.nn as nn
 from models.GTN2 import transformer_builder
+from torch.optim.lr_scheduler import LambdaLR
+from math import e
 
 from visualization import visualizeGraph, visualizeLoss
 from data.dataset import PredictShortestPathDataset
 from functions import prepare_data, save_checkpoint, is_correct, generate_enc_mas
+
 
 
 import sys # TODO: delete after done with development
@@ -37,7 +40,7 @@ config = {
   "batch_size": 50,
   "num_epochs": 6,
   # TODO: start with bigger one and gradually go down to 10**-4 or some other small number
-  "lr": 10**-4,
+  "lr": e**-3,
   "num_nodes": 100
 }
 
@@ -57,12 +60,13 @@ visualizeGraph(dataset, num_nodes=100, run=False)
 
 # max_src_len - max path length for source including EOS to start and end with
 # max_tgt_len - max path length for tgt including EOS to start with
-checkpoint, model = transformer_builder( src_num_nodes=config['num_nodes'], tgt_num_nodes=config['num_nodes'], max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False )
+checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False )
 model.to(device)
 
-optimizer = torch.optim.Adam(model.parameters(), lr=config['lr'], eps=1e-9)
+currTimeStep = 1
+Twarmup = 10
+optimizer = torch.optim.Adam(model.parameters(), lr=config['lr']*currTimeStep/Twarmup, eps=1e-9)
 
-# TODO: make sure loss doesn't count EOS by utilizing ignore_index param
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
 
 
@@ -103,7 +107,6 @@ for epoch in range(config['num_epochs']):
       # Edge Index list
       adj_input = edge_index_sample
       
-      # TODO: undesrtand what is decoder_input in the source code
       # y, to be deleted after the model is trained
       decoder_input = batch[i].y.to(device)
       # y_flag (represents whether a sample is not an optimal path), to be deleted after the model is trained
@@ -115,6 +118,9 @@ for epoch in range(config['num_epochs']):
       # Add EOS to the end of the current label(y)
       decoder_input = torch.cat( (decoder_input, torch.tensor([config['num_nodes']]).to(device)) )
       
+      # TODO ! MAKE SURE THAT BOTH LABEL AND PREDICTION HAVE EOS AT THE END
+      #sys.exit("_")
+
       # Loss, to be deleted after the model is trained
       loss = criterion(prediction.contiguous(), decoder_input.contiguous()).to(device)
 
@@ -130,6 +136,12 @@ for epoch in range(config['num_epochs']):
     
     # Update weights after every batch
     optimizer.step()
+
+    # Update lr (warmup)
+    for g in optimizer.param_groups:
+      currTimeStep += 1
+      g['lr'] = config['lr']*currTimeStep/Twarmup
+
     
     # Save average loss of the batch
     avg_batch_loss = (sum(temp_losses) / len(temp_losses))

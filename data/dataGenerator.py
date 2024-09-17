@@ -92,7 +92,6 @@ def generate_dataset( num_nodes, imperfect=False):
     if(math.sqrt(num_nodes) % 1):
         exit(f"Number of nodes = {num_nodes} can't form a grid layout")
 
-    # TODO: no repetitions
     # Max number of samples = num_nodes^2
 
     dataset = []

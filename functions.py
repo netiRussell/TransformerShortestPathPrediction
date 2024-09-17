@@ -58,7 +58,7 @@ def is_correct(X, edge_set, path):
 
 
 def generate_enc_mas(num_nodes, edge_set):
-    tmp_mask = torch.zeros((100, 100))
+    tmp_mask = torch.zeros((num_nodes+1, num_nodes+1))
 
     # Check if each consecutive pair in the path exists in the edge set
     for consideredNode in range(tmp_mask.shape[0]):
@@ -70,4 +70,9 @@ def generate_enc_mas(num_nodes, edge_set):
             if (consideredNode, otherNode) in edge_set:
                 tmp_mask[consideredNode][otherNode] = 1
     
+    # EOS case
+    initial_value_cm = list(1 for _ in range(num_nodes))
+    initial_value_cm.append(0)
+    tmp_mask[-1] = torch.tensor(initial_value_cm)
+
     return tmp_mask

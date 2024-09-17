@@ -1,6 +1,10 @@
 # Transformer portion is based on: https://github.com/hkproj/pytorch-transformer/blob/main/model.py
 # Improved and GCN added by Ruslan Abdulin
 
+"""
+Logic: graph is considered as whole and GCN2 are applied to it. Then, the resulted matrix goes into Transformer's encoder part where EOS(which is also a SOE = num_nodes) is included with the initial value of num_nodes(src_mask is set up to allow the connection to EOS from any node). Starting with the Decoder's part of the Transformer, the EOS is included.
+"""
+
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
@@ -75,11 +79,11 @@ class GCNs(nn.Module):
 # ! node_size = vocab_size
 # InputEmbedder class takes in a sequenece and returns embedded values - vectors of d_model dimension
 class InputEmbedder(nn.Module):
-  def __init__( self, d_model: int, num_nodes: int ):
+  def __init__( self, d_model: int, max_path_len: int ):
     super().__init__()
     self.d_model = d_model
-    self.num_nodes = num_nodes+1 # + 1 for EOS
-    self.embeddingLayer = nn.Embedding(self.num_nodes, d_model)
+    self.max_path_len = max_path_len
+    self.embeddingLayer = nn.Embedding(self.max_path_len, d_model)
   
   def forward( self, input ):
     # input: (max_path_len) --> (max_path_len, d_model)
@@ -285,7 +289,7 @@ class DecoderBlock(nn.Module):
     self.feed_forward_block = feed_forward_block
     self.resid_cons = nn.ModuleList([ResidualConnector(dropout), ResidualConnector(dropout), ResidualConnector(dropout)])
   
-  def forward( self, tgt_input, encoder_output, src_mask, training_step, training_mode):
+  def forward( self, tgt_input, encoder_output, cross_mask, training_step, training_mode):
     # Check if is in the training mode
     if training_mode is True:
       # Make sure tgt_input(the label) is masked during the cross attentions part as well
@@ -299,8 +303,6 @@ class DecoderBlock(nn.Module):
 
     # Prepare mask for the Cross Attentions
     # cross_mask = src_mask[:tgt_output.shape[0], :]
-    cross_mask = None
-    print(tgt_output.shape)
     
     """
       Cross-attentions
@@ -309,12 +311,10 @@ class DecoderBlock(nn.Module):
       3) Apply corresponding values to each corresponding index
     """
 
-    sys.exit("_")
+    #print(tgt_output.shape, encoder_output.shape)
 
     # Cross Attentions for values, keys as Encoder output and queries as the decoder block output; with source mask
     tgt_output = self.resid_cons[1](tgt_output, lambda tgt_output: self.cross_attention_block( tgt_output, encoder_output, encoder_output, cross_mask ))
-
-    sys.exit("_")
 
     # Feed Forward
     return self.resid_cons[2](tgt_output, self.feed_forward_block)
@@ -327,12 +327,12 @@ class Decoder(nn.Module):
     self.layers = layers
     self.norm = Normalizator()
   
-  def forward( self, tgt_input, encoder_output, src_mask, training_step, training_mode ):
+  def forward( self, tgt_input, encoder_output, cross_mask, training_step, training_mode ):
     current_tgt_output = tgt_input
 
     # Sequentially send input through every given DecoderBlock with the same mask
     for layer in self.layers:
-      current_tgt_output = layer(current_tgt_output, encoder_output, src_mask, training_step, training_mode)
+      current_tgt_output = layer(current_tgt_output, encoder_output, cross_mask, training_step, training_mode)
     
     # Normalize final output
     return self.norm(current_tgt_output)
@@ -355,7 +355,7 @@ class ProjectionLayer(nn.Module):
 class Transformer(nn.Module):
   def __init__( self, gcn: GCNs, encoder: Encoder, decoder: Decoder, src_embedding: InputEmbedder, tgt_embedding: InputEmbedder, src_pos: PoistionalEncoder, tgt_pos: PoistionalEncoder, projection_layer: ProjectionLayer ):
     super().__init__()
-    # torch.manual_seed(1234567) # TODO: delete after dev phase is done
+    torch.manual_seed(1234567) # TODO: delete after dev phase is done
     self.gcn = gcn
     self.encoder = encoder
     self.decoder = decoder
@@ -368,6 +368,9 @@ class Transformer(nn.Module):
   def encode( self, src_input, edge_index, src_mask ):
     # GCN2 applied
     out = self.gcn(src_input, edge_index)
+
+    # Add EOS to the resulted tensor
+    out = torch.cat(( out, torch.tensor([len(out)]) ))
 
     # Calculating embeddings for GCN output (encoder input); then adding them to positional encodings 
     out = self.src_embedding(out)
@@ -385,10 +388,10 @@ class Transformer(nn.Module):
     else:
       tgt_input = torch.tensor([eos]).to(device)
 
-    tmp_mask = None
+    # Initializing a tensor that will hold predictions [curr_seq_length, num_nodes+1]
     finalOut = torch.tensor([]).to(device)
 
-    # Loop
+    # The main Loop
     for step in range(1, max_path_len):
 
       # Calculating embeddings for predicted path(decoder input); then adding them to positional encodings
@@ -396,8 +399,36 @@ class Transformer(nn.Module):
       out = self.tgt_embedding(tgt_input)
       out = self.tgt_pos(out)
 
+      # Prepare current Cross-Attention mask
+      """
+      Cross-attentions
+      0) Make sure EOS is present for all masks [V]
+      1) Get access to current tgt_input [V]
+      2) Get indexes from each of tgt_input [V]
+      3) Apply corresponding values to each corresponding index [V]
+      4) Substitue raw_tgt_input with cross_mask in parameters [X]
+      5) Utilize the cross_mask [X]
+      6) Make sure that cross_mask has a shape of 101 = 100 nodes + EOS
+      """
+      # Initial value = [[EOS]]
+      cross_mask = src_mask[-1].unsqueeze(0)
+
+      if(training_mode == True):
+        # Training, check on step of the training
+        # TODO: omit tgt_input modification in DecoderBlock and substitute it with current_tgt_input for better perfomance 
+        current_tgt_input = tgt_input[1:step]
+
+        for elem in current_tgt_input:
+          cross_mask = torch.cat(( cross_mask, src_mask[elem.item()].unsqueeze(0) ))
+
+      else:
+        # Regular mode - Eval
+        for elem in tgt_input[1:]:
+          cross_mask = torch.cat(( cross_mask, src_mask[elem.item()].unsqueeze(0) ))
+      
+
       # Decoder forward pass
-      out = self.decoder(out, encoder_output, src_mask, step, training_mode)
+      out = self.decoder(out, encoder_output, cross_mask, step, training_mode)
       out = self.project(out)
       nextNode = torch.argmax(out[step-1]).to(device)
 
@@ -437,13 +468,13 @@ class Transformer(nn.Module):
 
 
 # -- Function to build a Transformer --
-def transformer_builder( src_num_nodes: int, tgt_num_nodes: int, max_src_len: int, max_tgt_len: int, d_model: int=512, num_encoderBlocks: int=6, num_attnHeads: int=8, dropout: float=0.1, d_ff: int=2048, resume: bool=False  ) -> Transformer:
+def transformer_builder( max_src_len: int, max_tgt_len: int, d_model: int=512, num_encoderBlocks: int=6, num_attnHeads: int=8, dropout: float=0.1, d_ff: int=2048, resume: bool=False  ) -> Transformer:
   # GCN layer
   gcn = GCNs(dropout)
 
   # Embedding layers
-  src_embedding = InputEmbedder(d_model, src_num_nodes)
-  tgt_embedding = InputEmbedder(d_model, tgt_num_nodes)
+  src_embedding = InputEmbedder(d_model, max_src_len)
+  tgt_embedding = InputEmbedder(d_model, max_tgt_len)
 
   # Positional Encoding layers
   src_posEnc = PoistionalEncoder(d_model, max_src_len, dropout)
