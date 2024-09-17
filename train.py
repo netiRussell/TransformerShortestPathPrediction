@@ -2,7 +2,6 @@ import torch
 import torch.nn as nn
 from models.GTN2 import transformer_builder
 from torch.optim.lr_scheduler import LambdaLR
-from math import e
 
 from visualization import visualizeGraph, visualizeLoss
 from data.dataset import PredictShortestPathDataset
@@ -40,7 +39,7 @@ config = {
   "batch_size": 50,
   "num_epochs": 6,
   # TODO: start with bigger one and gradually go down to 10**-4 or some other small number
-  "lr": e**-3,
+  "lr": 10**-4,
   "num_nodes": 100
 }
 
@@ -64,7 +63,7 @@ checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_
 model.to(device)
 
 currTimeStep = 1
-Twarmup = 10
+Twarmup = 10 # warmup will take place during the first 10 mini-batches
 optimizer = torch.optim.Adam(model.parameters(), lr=config['lr']*currTimeStep/Twarmup, eps=1e-9)
 
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
@@ -117,9 +116,6 @@ for epoch in range(config['num_epochs']):
 
       # Add EOS to the end of the current label(y)
       decoder_input = torch.cat( (decoder_input, torch.tensor([config['num_nodes']]).to(device)) )
-      
-      # TODO ! MAKE SURE THAT BOTH LABEL AND PREDICTION HAVE EOS AT THE END
-      #sys.exit("_")
 
       # Loss, to be deleted after the model is trained
       loss = criterion(prediction.contiguous(), decoder_input.contiguous()).to(device)
@@ -138,10 +134,10 @@ for epoch in range(config['num_epochs']):
     optimizer.step()
 
     # Update lr (warmup)
-    for g in optimizer.param_groups:
-      currTimeStep += 1
-      g['lr'] = config['lr']*currTimeStep/Twarmup
-
+    if( currTimeStep < Twarmup ):
+      for g in optimizer.param_groups:
+        currTimeStep += 1
+        g['lr'] = config['lr']*currTimeStep/Twarmup
     
     # Save average loss of the batch
     avg_batch_loss = (sum(temp_losses) / len(temp_losses))
