@@ -3,6 +3,7 @@ import os.path as osp
 import torch
 from torch_geometric.data import Dataset, Data
 import pandas as pd
+import numpy
 import ast
 
 class PredictShortestPathDataset(Dataset):
@@ -11,13 +12,15 @@ class PredictShortestPathDataset(Dataset):
 
   @property
   def raw_file_names(self):
-      return "perfect.csv"
+      return ["edge_index.parquet", "perfect.parquet"]
 
   @property
   def processed_file_names(self):
-    self.df = pd.read_csv(self.raw_paths[0])
-    return ['data_{}.pt'.format(i) for i in range(len(self.df)) ]
     #return 'none.pt'
+
+    self.df = pd.read_parquet(self.raw_paths[1])
+    return ['data_{}.pt'.format(i) for i in range(len(self.df)) ]
+    
 
   def download(self):
       pass
@@ -26,21 +29,29 @@ class PredictShortestPathDataset(Dataset):
     # ID for corresponding dataset 
     idx = 0
 
+    # Read and retrieve edge_index
+    self.df = pd.read_parquet(self.raw_paths[0], engine="auto")
+    self.df = self.df.reset_index()
+
+    for _, row in self.df.iterrows():
+        edge_index = torch.from_numpy(numpy.array([row['Edge index'][0], row['Edge index'][1]]))
+
     # Read the csv file
-    self.df = pd.read_csv(self.raw_paths[0])
+    self.df = pd.read_parquet(self.raw_paths[1], engine="auto")
     self.df = self.df.reset_index()
 
     # For each row, create data and increment idx
-    for index, row in self.df.iterrows():
+    for _, row in self.df.iterrows():
         # Parameters for a dataset
-        X = torch.tensor(ast.literal_eval(row['X']), dtype=torch.long)
-        y = torch.tensor(ast.literal_eval(row['Y'])[0], dtype=torch.long)
-        imperfect_y_flag = torch.tensor(ast.literal_eval(row['Y'])[1], dtype=torch.long).unsqueeze(1)
-        edge_index = torch.tensor(ast.literal_eval(row['Edge index']), dtype=torch.long)
+        X = torch.tensor(ast.literal_eval(row['X'].decode('utf-8')), dtype=torch.long)
+        y = torch.tensor(ast.literal_eval(row['Y'].decode('utf-8'))[0], dtype=torch.long)
+        imperfect_y_flag = torch.tensor(ast.literal_eval(row['Y'].decode('utf-8'))[1], dtype=torch.long).unsqueeze(1)
         
         data = Data(x=X, edge_index=edge_index, y=y, imperfect_y_flag=imperfect_y_flag, num_nodes=len(X))
 
         torch.save(data, osp.join(self.processed_dir, f'data_{idx}.pt'))
+
+        print(f'data_{idx}.pt is generated')
         idx += 1
 
   def len(self):
@@ -58,3 +69,5 @@ class PredictShortestPathDataset(Dataset):
 # print(dataset[0].x)
 # print(dataset[0].y)
 # print(dataset[0].edge_index.t())
+
+# ! TODO: Train iteratively by disregarding the rows that have been analyzed already: https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset
