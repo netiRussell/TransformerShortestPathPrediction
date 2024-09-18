@@ -342,7 +342,7 @@ class ProjectionLayer(nn.Module):
 
 # -- Transformer --
 class Transformer(nn.Module):
-  def __init__( self, gcn: GCNs, encoder: Encoder, decoder: Decoder, src_embedding: InputEmbedder, tgt_embedding: InputEmbedder, src_pos: PoistionalEncoder, tgt_pos: PoistionalEncoder, projection_layer: ProjectionLayer ):
+  def __init__( self, gcn: GCNs, encoder: Encoder, decoder: Decoder, src_embedding: InputEmbedder, tgt_embedding: InputEmbedder, src_pos: PoistionalEncoder, tgt_pos: PoistionalEncoder, projection_layer: ProjectionLayer, device ):
     super().__init__()
     torch.manual_seed(1234567) # TODO: delete after dev phase is done
     self.gcn = gcn
@@ -353,13 +353,14 @@ class Transformer(nn.Module):
     self.src_pos = src_pos
     self.tgt_pos = tgt_pos
     self.projection_layer = projection_layer
+    self.device = device
   
   def encode( self, src_input, edge_index, src_mask ):
     # GCN2 applied
     out = self.gcn(src_input, edge_index)
 
     # Add EOS to the resulted tensor
-    out = torch.cat(( out, torch.tensor([len(out)]) ))
+    out = torch.cat(( out, torch.tensor([len(out)]).to(self.device) ))
 
     # Calculating embeddings for GCN output (encoder input); then adding them to positional encodings 
     out = self.src_embedding(out)
@@ -368,17 +369,17 @@ class Transformer(nn.Module):
     # Ecnoder forward pass
     return self.encoder(out, src_mask)
 
-  def decode( self, encoder_output, src_mask, tgt_input, max_path_len, training_mode, device ):
+  def decode( self, encoder_output, src_mask, tgt_input, max_path_len, training_mode ):
 
     # Add EOS to the beginning of the sequence
     eos = max_path_len-1
     if(training_mode == True):
-      tgt_input = torch.cat((torch.tensor([eos]).to(device), tgt_input))
+      tgt_input = torch.cat((torch.tensor([eos]).to(self.device), tgt_input))
     else:
-      tgt_input = torch.tensor([eos]).to(device)
+      tgt_input = torch.tensor([eos]).to(self.device)
 
     # Initializing a tensor that will hold predictions [curr_seq_length, num_nodes+1]
-    finalOut = torch.tensor([]).to(device)
+    finalOut = torch.tensor([]).to(self.device)
 
     # The main Loop
     for step in range(1, max_path_len):
@@ -408,7 +409,7 @@ class Transformer(nn.Module):
       # Decoder forward pass
       out = self.decoder(out, encoder_output, cross_mask, step, training_mode)
       out = self.project(out)
-      nextNode = torch.argmax(out[step-1]).to(device)
+      nextNode = torch.argmax(out[step-1]).to(self.device)
 
       # Append next node to the final list of steps predicted
       finalOut = torch.cat((finalOut, out[step-1].unsqueeze(0)))
@@ -439,14 +440,14 @@ class Transformer(nn.Module):
     # Final linear NN
     return self.projection_layer(input)
 
-  def forward( self, encoder_input, decoder_input, adj_input, encoder_mask, max_path_len, device, training_mode=False ):
+  def forward( self, encoder_input, decoder_input, adj_input, encoder_mask, max_path_len, training_mode=False ):
     encoder_output = self.encode( encoder_input, adj_input, encoder_mask )
-    decoder_output = self.decode( encoder_output, encoder_mask, decoder_input, max_path_len, training_mode, device )
+    decoder_output = self.decode( encoder_output, encoder_mask, decoder_input, max_path_len, training_mode )
     return decoder_output
 
 
 # -- Function to build a Transformer --
-def transformer_builder( max_src_len: int, max_tgt_len: int, d_model: int=512, num_encoderBlocks: int=6, num_attnHeads: int=8, dropout: float=0.1, d_ff: int=2048, resume: bool=False  ) -> Transformer:
+def transformer_builder( max_src_len: int, max_tgt_len: int, d_model: int=512, num_encoderBlocks: int=6, num_attnHeads: int=8, dropout: float=0.1, d_ff: int=2048, resume: bool=False, device=torch.device('cpu')  ) -> Transformer:
   # GCN layer
   gcn = GCNs(dropout)
 
@@ -483,7 +484,7 @@ def transformer_builder( max_src_len: int, max_tgt_len: int, d_model: int=512, n
   projection_layer = ProjectionLayer(d_model, max_tgt_len)
 
   # Transformer
-  transformer = Transformer(gcn, encoder, decoder, src_embedding, tgt_embedding, src_posEnc, tgt_posEnc, projection_layer)
+  transformer = Transformer(gcn, encoder, decoder, src_embedding, tgt_embedding, src_posEnc, tgt_posEnc, projection_layer, device)
 
   # Resume parameters if continuing previous training
   if(resume):

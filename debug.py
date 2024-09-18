@@ -59,7 +59,7 @@ visualizeGraph(dataset, num_nodes=100, run=False)
 
 # max_src_len - max path length for source including EOS to start and end with
 # max_tgt_len - max path length for tgt including EOS to start with
-checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False )
+checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False, device=device )
 model.to(device)
 
 currTimeStep = 1
@@ -116,7 +116,7 @@ for epoch in range(config['num_epochs']):
       y_flag = batch[i].imperfect_y_flag.item()
 
       # Generate prediction (we're interested in probs, not the steps)
-      _, prediction = model( encoder_input, decoder_input, adj_input, encoder_mask, config['num_nodes']+1, device, training_mode=True )
+      _, prediction = model( encoder_input, decoder_input, adj_input, encoder_mask, config['num_nodes']+1, training_mode=True )
 
       # Add EOS to the end of the current label(y)
       decoder_input = torch.cat( (decoder_input, torch.tensor([config['num_nodes']]).to(device)) )
@@ -195,7 +195,7 @@ with torch.no_grad():
         label = batch[i].y.to(device)
 
         # Generate prediction (we're interested in steps, not the probs)
-        prediction, _ = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1, device)
+        prediction, _ = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1)
 
         # Check if the length of the output is correct
         if(len(label) != len(prediction)):
