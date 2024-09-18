@@ -14,14 +14,18 @@ def split_data(dataset, valid_ratio, total_samples, batch_size):
 
   return trainLoader, validationLoader
 
-def prepare_data(dataset, batch_size, valid_percantage):
+def prepare_data(dataset, batch_size, n_epochs, valid_percantage):
 
   trainLoader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
   sampler = RandomSampler(dataset, num_samples=int(len(dataset)*valid_percantage))
-  validLoader = DataLoader(dataset, batch_size=batch_size, shuffle=False, sampler=sampler)
+  valid_batch_size = int(len(dataset)/(n_epochs+2))
 
-  return trainLoader, validLoader
+  validLoader = DataLoader(dataset, batch_size=valid_batch_size, shuffle=False, sampler=sampler)
+
+  print(f'Lenght of dataset: {len(dataset)}, batch_size for validation and eval: {valid_batch_size}')
+
+  return trainLoader, validLoader, valid_batch_size
 
 
 def save_checkpoint(state, path='./savedGrads/checkpoint.pth.tar'):
@@ -76,3 +80,49 @@ def generate_enc_mas(num_nodes, edge_set):
     tmp_mask[-1] = torch.tensor(initial_value_cm)
 
     return tmp_mask
+
+
+# TODO: create a function that outputs current validaiton loss while using different untouched batch of data
+def validate_curr_epoch( validIter, valid_batch_size, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ):
+    model.eval()
+
+    try:
+        # Get the next validation / evaluation batch
+        batch = next(validIter)
+
+        complete_success_rate = []
+
+        for i in range(valid_batch_size):
+            # Imperfect sample; to be disregarded
+            # y_flag = batch[i].imperfect_y_flag.item()
+            # if( y_flag == 1 ):
+            #   continue
+
+            # X
+            encoder_input = batch[i].x.to(device)
+            # Edge Index list
+            adj_input = edge_index_sample
+            # y
+            label = batch[i].y.to(device)
+
+            # Generate prediction (we're interested in steps, not the probs)
+            prediction, _ = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1, device)
+
+            # Check if the length of the output is correct
+            if(len(label) != len(prediction)):
+                complete_success_rate.append(0)
+                continue
+            
+            # Check if all the nodes are correct and src and dest are correct
+            complete_success_rate.append( is_correct(encoder_input, edge_set_sample, prediction) )
+        
+        loss = (sum(complete_success_rate) / len(complete_success_rate))*100
+        print(f"Current validation percantage: {loss}%")
+
+        model.train()
+        return loss
+    
+    except StopIteration:
+        # Avoid raising StopIteration
+        model.train()
+        print("No more untouched data for valid/eval left")

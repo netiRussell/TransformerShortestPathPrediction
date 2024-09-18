@@ -70,4 +70,4 @@ class PredictShortestPathDataset(Dataset):
 # print(dataset[0].y)
 # print(dataset[0].edge_index.t())
 
-# ! TODO: Train iteratively by disregarding the rows that have been analyzed already: https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset
+# ! TODO: LARGE DATASET CASE: Train iteratively by disregarding the rows that have been analyzed already: https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset

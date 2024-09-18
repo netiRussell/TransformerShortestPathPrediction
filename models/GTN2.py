@@ -302,17 +302,6 @@ class DecoderBlock(nn.Module):
     # TODO: For decoder and cross attention masks - include EOS. All elems except the last one must not have access to EOS. Cross attentions is the same one as src_mask but with corresponding values (eg. node 2 must have values from src_mask[2][:] applied), also keep EOS open to every element.
 
     # Prepare mask for the Cross Attentions
-    # cross_mask = src_mask[:tgt_output.shape[0], :]
-    
-    """
-      Cross-attentions
-      1) Get access to current tgt_input
-      2) Get indexes from each of tgt_input
-      3) Apply corresponding values to each corresponding index
-    """
-
-    #print(tgt_output.shape, encoder_output.shape)
-
     # Cross Attentions for values, keys as Encoder output and queries as the decoder block output; with source mask
     tgt_output = self.resid_cons[1](tgt_output, lambda tgt_output: self.cross_attention_block( tgt_output, encoder_output, encoder_output, cross_mask ))
 
@@ -400,22 +389,11 @@ class Transformer(nn.Module):
       out = self.tgt_pos(out)
 
       # Prepare current Cross-Attention mask
-      """
-      Cross-attentions
-      0) Make sure EOS is present for all masks [V]
-      1) Get access to current tgt_input [V]
-      2) Get indexes from each of tgt_input [V]
-      3) Apply corresponding values to each corresponding index [V]
-      4) Substitue raw_tgt_input with cross_mask in parameters [X]
-      5) Utilize the cross_mask [X]
-      6) Make sure that cross_mask has a shape of 101 = 100 nodes + EOS
-      """
       # Initial value = [[EOS]]
       cross_mask = src_mask[-1].unsqueeze(0)
 
       if(training_mode == True):
         # Training, check on step of the training
-        # TODO: omit tgt_input modification in DecoderBlock and substitute it with current_tgt_input for better perfomance 
         current_tgt_input = tgt_input[1:step]
 
         for elem in current_tgt_input:

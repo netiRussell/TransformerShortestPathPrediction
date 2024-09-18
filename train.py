@@ -48,7 +48,7 @@ config = {
 dataset = PredictShortestPathDataset(root="./data")
 total_samples = len(dataset)
 
-trainLoader, validLoader = prepare_data( dataset=dataset, batch_size=config['batch_size'], valid_percantage=0.4)
+trainLoader, validLoader, valid_batch_size = prepare_data( dataset=dataset, batch_size=config['batch_size'], n_epochs=config['num_epochs'], valid_percantage=1)
 
 
 # -- Visualize a single data sample --
@@ -172,10 +172,11 @@ with torch.no_grad():
   complete_success_rate = []
 
   for batch_index, batch in enumerate(validLoader):
-    for i in range(config['batch_size']):
+    for i in range(valid_batch_size):
       # Imperfect sample; to be disregarded
-      if( y_flag == 1 ):
-        continue
+      # y_flag = batch[i].imperfect_y_flag.item()
+      # if( y_flag == 1 ):
+      #   continue
       
       # X
       encoder_input = batch[i].x.to(device)
