@@ -5,17 +5,11 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from visualization import visualizeGraph, visualizeLoss
 from data.dataset import PredictShortestPathDataset
-from functions import prepare_data, save_checkpoint, is_correct, generate_enc_mas, validate_curr_epoch
+from functions import prepare_data, get_eval_dataset, save_checkpoint, is_correct, generate_enc_mas, validate_curr_epoch
 
 
 
 import sys # TODO: delete after done with development
-
-# TODO: Implement cross-attention mask based on the encoder mask
-# TODO: Try to retrain the model. Record outcome
-
-# TODO: Implement dynamic learning rate
-# TODO: Try to retrain the model. Record outcome
 
 # TODO: Compare results of batch_size = 20 and = 100. Try different hyperparameters !
 # TODO: Try to retrain the model. Record outcome
@@ -48,7 +42,7 @@ config = {
 dataset = PredictShortestPathDataset(root="./data")
 total_samples = len(dataset)
 
-trainLoader, validLoader, valid_batch_size = prepare_data( dataset=dataset, batch_size=config['batch_size'], n_epochs=config['num_epochs'], valid_percantage=1)
+trainLoader, validLoader = prepare_data( dataset=dataset, batch_size=config['batch_size'], n_epochs=config['num_epochs'])
 
 
 # -- Visualize a single data sample --
@@ -133,7 +127,7 @@ for epoch in range(config['num_epochs']):
       
       # Backpropagation
       loss.backward()
-    
+
     # Update weights after every batch
     optimizer.step()
 
@@ -150,7 +144,7 @@ for epoch in range(config['num_epochs']):
     print(f"Epoch: {epoch+1}, Batch: {batch_index}, Loss: {avg_batch_loss}")
   
   # Validate current epoch
-  validLoss.append(validate_curr_epoch( validIter, valid_batch_size, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ))
+  validLoss.append(validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ))
 
 
 # -- Save progress of training --
@@ -172,6 +166,7 @@ visualizeLoss([losses, validLoss], run=True)
 
 # -- Evaluation --
 model.eval()
+evalIter = iter( get_eval_dataset(dataset, valid_percantage=0.3) )
 
 with torch.no_grad():
   complete_success_rate = []
@@ -179,14 +174,14 @@ with torch.no_grad():
   while True:
     try:
       # Get the next validation / evaluation batch
-      batch = next(validIter)
+      batch = next(evalIter)
 
-      for i in range(valid_batch_size):
+      for i in range(len(batch)):
         # Imperfect sample; to be disregarded
         # y_flag = batch[i].imperfect_y_flag.item()
         # if( y_flag == 1 ):
         #   continue
-        
+
         # X
         encoder_input = batch[i].x.to(device)
         # Edge Index list
@@ -202,15 +197,15 @@ with torch.no_grad():
           complete_success_rate.append(0)
           continue
 
-        print("Current prediction reviewed: ", prediction)
-        print("Correct answer: ", label)
+        # print("Current prediction reviewed: ", prediction)
+        # print("Correct answer: ", label)
         
         # Check if all the nodes are correct and src and dest are correct
         complete_success_rate.append( is_correct(encoder_input, edge_set_sample, prediction) )
       
+      print("100 more samples have been Evaluated...")
     except StopIteration:
       # Avoid raising StopIteration
-      print("No more untouched data for valid/eval left")
       break
 
 print(f"Complete success percentage (length and all elements are correct): {(sum(complete_success_rate) / len(complete_success_rate)) * 100 }%")

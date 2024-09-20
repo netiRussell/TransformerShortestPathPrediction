@@ -14,18 +14,24 @@ def split_data(dataset, valid_ratio, total_samples, batch_size):
 
   return trainLoader, validationLoader
 
-def prepare_data(dataset, batch_size, n_epochs, valid_percantage):
+def prepare_data(dataset, batch_size, n_epochs):
 
   trainLoader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
 
-  sampler = RandomSampler(dataset, num_samples=int(len(dataset)*valid_percantage))
-  valid_batch_size = int(len(dataset)/(n_epochs+2))
+  sampler = RandomSampler(dataset, num_samples=len(dataset))
+  valid_batch_size = int(len(dataset)/n_epochs)
 
   validLoader = DataLoader(dataset, batch_size=valid_batch_size, shuffle=False, sampler=sampler)
 
   print(f'Lenght of dataset: {len(dataset)}, batch_size for validation and eval: {valid_batch_size}')
 
-  return trainLoader, validLoader, valid_batch_size
+  return trainLoader, validLoader
+
+def get_eval_dataset(dataset, valid_percantage):
+  sampler = RandomSampler(dataset, num_samples=int(len(dataset)*valid_percantage))
+  validLoader = DataLoader(dataset, batch_size=100, shuffle=False, sampler=sampler)
+
+  return validLoader
 
 
 def save_checkpoint(state, path='./savedGrads/checkpoint.pth.tar'):
@@ -83,7 +89,7 @@ def generate_enc_mas(num_nodes, edge_set):
 
 
 # TODO: create a function that outputs current validaiton loss while using different untouched batch of data
-def validate_curr_epoch( validIter, valid_batch_size, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ):
+def validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ):
     model.eval()
 
     try:
@@ -92,7 +98,7 @@ def validate_curr_epoch( validIter, valid_batch_size, edge_index_sample, edge_se
 
         complete_success_rate = []
 
-        for i in range(valid_batch_size):
+        for i in range(len(batch)):
             # Imperfect sample; to be disregarded
             # y_flag = batch[i].imperfect_y_flag.item()
             # if( y_flag == 1 ):
