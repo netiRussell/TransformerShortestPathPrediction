@@ -133,8 +133,8 @@ for epoch in range(config['num_epochs']):
 
     # Update lr (warmup)
     if( currTimeStep < Twarmup ):
+      currTimeStep += 1
       for g in optimizer.param_groups:
-        currTimeStep += 1
         g['lr'] = config['lr']*currTimeStep/Twarmup
     
     # Save average loss of the batch
@@ -157,7 +157,7 @@ save_checkpoint({
             'total_epochs': config['num_epochs'],
             'prevConfig': config
             })
-print(f'The model has been saved at {config['num_epochs']} epochs')
+print(f'The model has been saved at {config["num_epochs"]} epochs')
 
 
 # -- Visualization of loss curve --
