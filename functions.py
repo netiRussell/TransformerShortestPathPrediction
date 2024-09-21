@@ -112,7 +112,7 @@ def validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, e
             label = batch[i].y.to(device)
 
             # Generate prediction (we're interested in steps, not the probs)
-            prediction, _ = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1, device)
+            prediction, _ = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1)
 
             # Check if the length of the output is correct
             if(len(label) != len(prediction)):
