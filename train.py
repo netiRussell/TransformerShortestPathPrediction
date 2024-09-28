@@ -5,13 +5,11 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from visualization import visualizeGraph, visualizeLoss
 from data.dataset import PredictShortestPathDataset
-from functions import prepare_data, get_eval_dataset, save_checkpoint, is_correct, generate_enc_mas, validate_curr_epoch
+from functions import get_data_subset, get_eval_subset, save_checkpoint, is_correct, generate_enc_mas, validate_curr_epoch
 
 
 
 import sys # TODO: delete after done with development
-
-# ! TODO: stop using exhaustive approach and use random subset every epoch.
 
 # TODO: Compare results of batch_size = 20 and = 100. Try different hyperparameters !
 # TODO: Try to retrain the model. Record outcome
@@ -36,15 +34,13 @@ config = {
   "num_epochs": 6,
   # TODO: start with bigger one and gradually go down to 10**-4 or some other small number
   "lr": 10**-4,
-  "num_nodes": 100
+  "num_nodes": 100,
+  "num_samples": 12500
 }
 
 
 # -- Dataset --
 dataset = PredictShortestPathDataset(root="./data")
-total_samples = len(dataset)
-
-trainLoader, validLoader = prepare_data( dataset=dataset, batch_size=config['batch_size'], n_epochs=config['num_epochs'])
 
 
 # -- Visualize a single data sample --
@@ -52,9 +48,6 @@ visualizeGraph(dataset, num_nodes=100, run=False)
 
 
 # -- Model & Optimizer & Criterion --
-
-# max_src_len - max path length for source including EOS to start and end with
-# max_tgt_len - max path length for tgt including EOS to start with
 checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False, device=device )
 model.to(device)
 
@@ -82,10 +75,9 @@ losses = list()
 
 # Validation / Evaluation variables
 validLoss = []
-validIter = iter(validLoader)
 
 # Getting universal edge index
-edge_index_sample = next(iter(trainLoader))[0].edge_index.to(device)
+edge_index_sample = next(iter(get_data_subset(dataset, batch_size=1, n_samples=1)))[0].edge_index.to(device)
 edge_set_sample = set(zip(edge_index_sample[0].tolist(), edge_index_sample[1].tolist()))
 
 # Encoder mask
@@ -93,6 +85,8 @@ encoder_mask = generate_enc_mas(num_nodes=config['num_nodes'], edge_set=edge_set
 
 for epoch in range(config['num_epochs']):
   # One epoch
+  trainLoader = get_data_subset(dataset, batch_size=config['batch_size'], n_samples=config['num_samples'])
+
   for batch_index, batch in enumerate(trainLoader):
     # One batch
     optimizer.zero_grad()
@@ -146,13 +140,11 @@ for epoch in range(config['num_epochs']):
     print(f"Epoch: {epoch+1}, Batch: {batch_index}, Loss: {avg_batch_loss}")
   
   # Validate current epoch
+  validIter = iter( get_data_subset(dataset, batch_size=config['batch_size'], n_samples=config['num_samples']) )
   validLoss.append(validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ))
 
 
 # -- Save progress of training --
-if('total_epochs' in locals()):
-  config['num_epochs'] += total_epochs
-
 save_checkpoint({
             'model_state_dict': model.state_dict(),
             'optimizer_state_dict': optimizer.state_dict(),
@@ -168,7 +160,7 @@ visualizeLoss([losses, validLoss], run=True)
 
 # -- Evaluation --
 model.eval()
-evalIter = iter( get_eval_dataset(dataset, valid_percantage=0.3) )
+evalIter = iter( get_eval_subset(dataset, valid_percantage=0.3) )
 
 with torch.no_grad():
   complete_success_rate = []

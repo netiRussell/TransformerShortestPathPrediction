@@ -3,17 +3,6 @@ from torch_geometric.loader import DataLoader
 import torch
 import os
 
-def split_data(dataset, valid_ratio, total_samples, batch_size):
-  train_size = int(total_samples * (1.0 - valid_ratio))
-  validation_size = total_samples - train_size
-
-  train_dataset, validation_dataset = torch.utils.data.random_split(dataset, [train_size, validation_size])
-
-  trainLoader = DataLoader(train_dataset, batch_size=batch_size, shuffle=True)
-  validationLoader = DataLoader(validation_dataset, batch_size=100, shuffle=False)
-
-  return trainLoader, validationLoader
-
 def prepare_data(dataset, batch_size, n_epochs):
 
   trainLoader = DataLoader(dataset, batch_size=batch_size, shuffle=True)
@@ -27,7 +16,14 @@ def prepare_data(dataset, batch_size, n_epochs):
 
   return trainLoader, validLoader
 
-def get_eval_dataset(dataset, valid_percantage):
+def get_data_subset(dataset, batch_size, n_samples):
+    
+    sampler = RandomSampler(dataset, num_samples=n_samples)
+    trainLoader = DataLoader(dataset, batch_size=batch_size, sampler=sampler)
+
+    return trainLoader
+
+def get_eval_subset(dataset, valid_percantage):
   sampler = RandomSampler(dataset, num_samples=int(len(dataset)*valid_percantage))
   validLoader = DataLoader(dataset, batch_size=100, shuffle=False, sampler=sampler)
 
