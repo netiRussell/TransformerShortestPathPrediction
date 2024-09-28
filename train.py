@@ -5,17 +5,13 @@ from torch.optim.lr_scheduler import LambdaLR
 
 from visualization import visualizeGraph, visualizeLoss
 from data.dataset import PredictShortestPathDataset
-from functions import prepare_data, save_checkpoint, is_correct, generate_enc_mas
+from functions import prepare_data, get_eval_dataset, save_checkpoint, is_correct, generate_enc_mas, validate_curr_epoch
 
 
 
 import sys # TODO: delete after done with development
 
-# TODO: Implement cross-attention mask based on the encoder mask
-# TODO: Try to retrain the model. Record outcome
-
-# TODO: Implement dynamic learning rate
-# TODO: Try to retrain the model. Record outcome
+# ! TODO: stop using exhaustive approach and use random subset every epoch.
 
 # TODO: Compare results of batch_size = 20 and = 100. Try different hyperparameters !
 # TODO: Try to retrain the model. Record outcome
@@ -48,7 +44,7 @@ config = {
 dataset = PredictShortestPathDataset(root="./data")
 total_samples = len(dataset)
 
-trainLoader, validLoader, valid_batch_size = prepare_data( dataset=dataset, batch_size=config['batch_size'], n_epochs=config['num_epochs'], valid_percantage=1)
+trainLoader, validLoader = prepare_data( dataset=dataset, batch_size=config['batch_size'], n_epochs=config['num_epochs'])
 
 
 # -- Visualize a single data sample --
@@ -59,7 +55,7 @@ visualizeGraph(dataset, num_nodes=100, run=False)
 
 # max_src_len - max path length for source including EOS to start and end with
 # max_tgt_len - max path length for tgt including EOS to start with
-checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False )
+checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False, device=device )
 model.to(device)
 
 currTimeStep = 1
@@ -83,6 +79,10 @@ if ( False ):
 # -- Training Loop --
 model.train()
 losses = list()
+
+# Validation / Evaluation variables
+validLoss = []
+validIter = iter(validLoader)
 
 # Getting universal edge index
 edge_index_sample = next(iter(trainLoader))[0].edge_index.to(device)
@@ -112,7 +112,7 @@ for epoch in range(config['num_epochs']):
       y_flag = batch[i].imperfect_y_flag.item()
 
       # Generate prediction (we're interested in probs, not the steps)
-      _, prediction = model( encoder_input, decoder_input, adj_input, encoder_mask, config['num_nodes']+1, device, training_mode=True )
+      _, prediction = model( encoder_input, decoder_input, adj_input, encoder_mask, config['num_nodes']+1, training_mode=True )
 
       # Add EOS to the end of the current label(y)
       decoder_input = torch.cat( (decoder_input, torch.tensor([config['num_nodes']]).to(device)) )
@@ -129,14 +129,14 @@ for epoch in range(config['num_epochs']):
       
       # Backpropagation
       loss.backward()
-    
+
     # Update weights after every batch
     optimizer.step()
 
     # Update lr (warmup)
     if( currTimeStep < Twarmup ):
+      currTimeStep += 1
       for g in optimizer.param_groups:
-        currTimeStep += 1
         g['lr'] = config['lr']*currTimeStep/Twarmup
     
     # Save average loss of the batch
@@ -144,13 +144,14 @@ for epoch in range(config['num_epochs']):
     losses.append(avg_batch_loss)
 
     print(f"Epoch: {epoch+1}, Batch: {batch_index}, Loss: {avg_batch_loss}")
+  
+  # Validate current epoch
+  validLoss.append(validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ))
 
 
 # -- Save progress of training --
 if('total_epochs' in locals()):
   config['num_epochs'] += total_epochs
-
-num_epochs = config['num_epochs']
 
 save_checkpoint({
             'model_state_dict': model.state_dict(),
@@ -158,47 +159,55 @@ save_checkpoint({
             'total_epochs': config['num_epochs'],
             'prevConfig': config
             })
-print(f'The model has been saved at {num_epochs} epochs')
+print(f'The model has been saved at {config["num_epochs"]} epochs')
 
 
 # -- Visualization of loss curve --
-visualizeLoss(losses, run=True)
+visualizeLoss([losses, validLoss], run=True)
 
 
 # -- Evaluation --
 model.eval()
+evalIter = iter( get_eval_dataset(dataset, valid_percantage=0.3) )
 
 with torch.no_grad():
   complete_success_rate = []
 
-  for batch_index, batch in enumerate(validLoader):
-    for i in range(valid_batch_size):
-      # Imperfect sample; to be disregarded
-      # y_flag = batch[i].imperfect_y_flag.item()
-      # if( y_flag == 1 ):
-      #   continue
+  while True:
+    try:
+      # Get the next validation / evaluation batch
+      batch = next(evalIter)
+
+      for i in range(len(batch)):
+        # Imperfect sample; to be disregarded
+        # y_flag = batch[i].imperfect_y_flag.item()
+        # if( y_flag == 1 ):
+        #   continue
+
+        # X
+        encoder_input = batch[i].x.to(device)
+        # Edge Index list
+        adj_input = edge_index_sample
+        # y
+        label = batch[i].y.to(device)
+
+        # Generate prediction (we're interested in steps, not the probs)
+        prediction, _ = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1)
+
+        # Check if the length of the output is correct
+        if(len(label) != len(prediction)):
+          complete_success_rate.append(0)
+          continue
+
+        # print("Current prediction reviewed: ", prediction)
+        # print("Correct answer: ", label)
+        
+        # Check if all the nodes are correct and src and dest are correct
+        complete_success_rate.append( is_correct(encoder_input, edge_set_sample, prediction) )
       
-      # X
-      encoder_input = batch[i].x.to(device)
-      # Edge Index list
-      adj_input = edge_index_sample
-      # y
-      label = batch[i].y.to(device)
+      print("100 more samples have been Evaluated...")
+    except StopIteration:
+      # Avoid raising StopIteration
+      break
 
-      # Generate prediction (we're interested in steps, not the probs)
-      prediction, _ = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1, device)
-
-      # Check if the length of the output is correct
-      if(len(label) != len(prediction)):
-        complete_success_rate.append(0)
-        continue
-
-      print("Current prediction reviewed: ", prediction)
-      print("Correct answer: ", label)
-      
-      # Check if all the nodes are correct and src and dest are correct
-      complete_success_rate.append( is_correct(encoder_input, edge_set_sample, prediction) )
-    
-    print(f"Evaluation is in the process... Current batch = {batch_index}")
-
-  print(f"Complete success percentage (length and all elements are correct): {(sum(complete_success_rate) / len(complete_success_rate)) * 100 }%")
+print(f"Complete success percentage (length and all elements are correct): {(sum(complete_success_rate) / len(complete_success_rate)) * 100 }%")
