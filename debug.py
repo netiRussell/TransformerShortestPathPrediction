@@ -11,8 +11,6 @@ from functions import get_data_subset, get_eval_subset, save_checkpoint, is_corr
 
 import sys # TODO: delete after done with development
 
-# ! TODO: stop using exhaustive approach and use random subset every epoch.
-
 # TODO: Compare results of batch_size = 20 and = 100. Try different hyperparameters !
 # TODO: Try to retrain the model. Record outcome
 
@@ -45,10 +43,6 @@ config = {
 dataset = PredictShortestPathDataset(root="./data")
 
 
-# -- Visualize a single data sample --
-visualizeGraph(dataset, num_nodes=100, run=False)
-
-
 # -- Model & Optimizer & Criterion --
 checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False, device=device )
 model.to(device)
@@ -58,17 +52,6 @@ Twarmup = 10 # warmup will take place during the first 10 mini-batches
 optimizer = torch.optim.Adam(model.parameters(), lr=config['lr']*currTimeStep/Twarmup, eps=1e-9)
 
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
-
-
-# -- Load model & optimizer --
-if ( False ):
-  checkpoint = torch.load('./savedGrads/checkpoint.pth.tar')
-  model.load_state_dict(checkpoint['model_state_dict'])
-  optimizer.load_state_dict(checkpoint['optimizer_state_dict'])
-  total_epochs = checkpoint['total_epochs']
-  prevConfig = checkpoint['prevConfig']
-
-  print(f'Training is resumed! Starting from epoch #{total_epochs}')
 
 
 # -- Training Loop --
@@ -107,40 +90,7 @@ for epoch in range(config['num_epochs']):
       # y_flag (represents whether a sample is not an optimal path), to be deleted after the model is trained
       y_flag = batch[i].imperfect_y_flag.item()
 
-      # Generate prediction (we're interested in probs, not the steps)
-      _, prediction = model( encoder_input, decoder_input, adj_input, encoder_mask, config['num_nodes']+1, training_mode=True )
+      print(f"y: {decoder_input}, i {i}")
 
-      # Add EOS to the end of the current label(y)
-      decoder_input = torch.cat( (decoder_input, torch.tensor([config['num_nodes']]).to(device)) )
-
-      # Loss, to be deleted after the model is trained
-      loss = criterion(prediction.contiguous(), decoder_input.contiguous()).to(device)
-
-      # Save loss
-      temp_losses.append(loss.item())
-
-      # Imperfect sample case
-      if(y_flag == 1):
-        loss = 0.15*loss
-      
-      # Backpropagation
-      loss.backward()
-
-    # Update weights after every batch
-    optimizer.step()
-
-    # Update lr (warmup)
-    if( currTimeStep < Twarmup ):
-      currTimeStep += 1
-      for g in optimizer.param_groups:
-        g['lr'] = config['lr']*currTimeStep/Twarmup
-    
-    # Save average loss of the batch
-    avg_batch_loss = (sum(temp_losses) / len(temp_losses))
-    losses.append(avg_batch_loss)
-
-    print(f"Epoch: {epoch+1}, Batch: {batch_index}, Loss: {avg_batch_loss}")
-  
-  # Validate current epoch
-  validIter = iter( get_data_subset(dataset, batch_size=config['batch_size'], n_samples=config['num_samples']) )
-  validLoss.append(validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ))
+    print(f"Epoch: {epoch+1}, Batch: {batch_index}")
+    sys.exit()

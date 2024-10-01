@@ -5,6 +5,9 @@ from torch_geometric.data import Dataset, Data
 import pandas as pd
 import numpy
 import ast
+import h5py
+
+import sys
 
 class PredictShortestPathDataset(Dataset):
   def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
@@ -36,7 +39,7 @@ class PredictShortestPathDataset(Dataset):
     for _, row in self.df.iterrows():
         edge_index = torch.from_numpy(numpy.array([row['Edge index'][0], row['Edge index'][1]]))
 
-    # Read the csv file
+    # Read the parquet file
     self.df = pd.read_parquet(self.raw_paths[1], engine="auto")
     self.df = self.df.reset_index()
 
@@ -61,13 +64,7 @@ class PredictShortestPathDataset(Dataset):
       data = torch.load(osp.join(self.processed_dir, f'data_{idx}.pt'))
       return data
   
-# dataset = set of generated data.
-# When dataset[some index] is accesed, self.get function called
-# This function retrieves corresponding file from the data folder
-# dataset = PredictShortestPathDataset(root="./data")
-
-# print(dataset[0].x)
-# print(dataset[0].y)
-# print(dataset[0].edge_index.t())
-
-# ! TODO: LARGE DATASET CASE: Train iteratively by disregarding the rows that have been analyzed already: https://pytorch.org/docs/stable/data.html#torch.utils.data.IterableDataset
+# TODO:
+# - Take edge_index out and save it once
+# - Try to use HDF5 file format instead of pt (you can save and load everythin on your own. Just return Data in get method)
+# - Consider saving each a batch in each file instead of a single sample.
