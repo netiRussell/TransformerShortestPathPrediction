@@ -90,7 +90,4 @@ for epoch in range(config['num_epochs']):
       # y_flag (represents whether a sample is not an optimal path), to be deleted after the model is trained
       y_flag = batch[i].imperfect_y_flag.item()
 
-      print(f"y: {decoder_input}, i {i}")
-
     print(f"Epoch: {epoch+1}, Batch: {batch_index}")
-    sys.exit()
