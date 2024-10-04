@@ -11,28 +11,24 @@ import sys
 
 class PredictShortestPathDataset(Dataset):
   def __init__(self, root, transform=None, pre_transform=None, pre_filter=None):
-      super().__init__(root, transform, pre_transform, pre_filter)
-      self.edge_index = None
+    super().__init__(root, transform, pre_transform, pre_filter)
 
   @property
   def raw_file_names(self):
-      return ["edge_index.parquet", "perfect.parquet"]
+    return ["edge_index.parquet", "perfect.parquet"]
 
   @property
   def processed_file_names(self):
-    #return 'none.pt'
+    # return 'none.pt'
 
     self.df = pd.read_parquet(self.raw_paths[1])
-    return ['data_{}.h5'.format(i) for i in range(len(self.df)) ]
+    return ['data_{}.h5'.format(i) for i in range(len(self.df)//(2*100)) ]
     
 
   def download(self):
-      pass
+    pass
 
   def process(self):
-    # ID for corresponding dataset 
-    idx = 0
-
     # Read and retrieve edge_index
     self.df = pd.read_parquet(self.raw_paths[0], engine="auto")
     self.df = self.df.reset_index()
@@ -49,47 +45,61 @@ class PredictShortestPathDataset(Dataset):
     self.df = pd.read_parquet(self.raw_paths[1], engine="auto")
     self.df = self.df.reset_index()
 
-    
     # For each row, create data and increment idx
+    idx = 0 # ID for corresponding sample
+    counter = 0
+    num_samples_per_file = 100
+    h5f = None
+    dt = h5py.vlen_dtype(numpy.dtype('long'))
+
     for _, row in self.df.iterrows():
-        # Parameters for a dataset
-        X = torch.tensor(ast.literal_eval(row['X'].decode('utf-8')), dtype=torch.long)
-        y = torch.tensor(ast.literal_eval(row['Y'].decode('utf-8'))[0], dtype=torch.long)
-        imperfect_y_flag = torch.tensor(ast.literal_eval(row['Y'].decode('utf-8'))[1], dtype=torch.long).unsqueeze(1)
 
-        h5_file_path = osp.join(self.processed_dir, f'data_{idx}.h5')
-        with h5py.File(h5_file_path, 'w') as h5f:
-            # Save each dataset sample into the HDF5 file
-            group = h5f.create_group(f'data_{idx}')
-            group.create_dataset('x', data=X.numpy())
-            group.create_dataset('y', data=y.numpy())
-            group.create_dataset('imperfect_y_flag', data=imperfect_y_flag.numpy())
-            group.attrs['num_nodes'] = len(X)
+        # Every even sample is disregarded to minimize the total # of samples
+        if counter % 2 != 0:
+           counter += 1
+           continue
 
-            print(f'data_{idx}.pt is generated')
-            idx += 1
+        if(idx % num_samples_per_file == 0):
+            # Create a file and initialize datasets # TODO: init or declare?
+            num_nodes = len(numpy.array(ast.literal_eval(row['X'].decode('utf-8'))))
+            h5_file_path = osp.join(self.processed_dir, f'data_{idx // num_samples_per_file}.h5')
+            h5f = h5py.File(h5_file_path, 'w')
+
+            x_set = h5f.create_dataset('x', shape=(num_samples_per_file, num_nodes, ), dtype=dt)
+            y_set = h5f.create_dataset('y', shape=(num_samples_per_file,), dtype=dt)
+            flag_set = h5f.create_dataset('imperfect_y_flag', shape=(num_samples_per_file,), dtype=dt)
+            h5f.attrs['num_nodes'] = num_nodes
+
+        #Append samples
+        row_num = idx % num_samples_per_file
+        x_set[row_num, ...] = torch.tensor(ast.literal_eval(row['X'].decode('utf-8'))).numpy()
+        y_set[row_num, ...] = torch.tensor(ast.literal_eval(row['Y'].decode('utf-8'))[0]).numpy()
+        flag_set[row_num, ...] = torch.tensor([ast.literal_eval(row['Y'].decode('utf-8'))[1]]).numpy()
+
+        idx += 1
+        counter += 1
+        print(f'data_{idx}.pt generated in {idx // num_samples_per_file}')
 
   def len(self):
-      return len(self.processed_file_names)
+        return len(self.processed_file_names) // 2 # since every 2nd sample is disregarded
 
   def get(self, idx):
-      h5_file_path = osp.join(self.processed_dir, 'edge_index.h5')
-      with h5py.File(h5_file_path, 'r') as h5f:
-         edge_index = torch.tensor(h5f['edge_index'][:])
+        num_samples_per_file = 100
 
-      h5_file_path = osp.join(self.processed_dir, f'data_{idx}.h5')
-      with h5py.File(h5_file_path, 'r') as h5f:
-        group = h5f[f'data_{idx}']
-        X = torch.tensor(group['x'][:])
-        y = torch.tensor(group['y'][:])
-        imperfect_y_flag = torch.tensor(group['imperfect_y_flag'][:])
-        num_nodes = group.attrs['num_nodes']
+        h5_file_path = osp.join(self.processed_dir, 'edge_index.h5')
+        with h5py.File(h5_file_path, 'r') as h5f:
+            edge_index = torch.tensor(h5f['edge_index'][:])
 
-      data = Data(x=X, edge_index=edge_index, y=y, imperfect_y_flag=imperfect_y_flag, num_nodes=num_nodes)
-      return data
-  
-# TODO:
-# - Take edge_index out and save it once
-# - Try to use HDF5 file format instead of pt (you can save and load everythin on your own. Just return Data in get method)
+        h5_file_path = osp.join(self.processed_dir, f'data_{idx // num_samples_per_file}.h5')
+        h5f = h5py.File(h5_file_path, 'r')
 
-# - Consider saving each a batch in each file instead of a single sample.
+        x_numeric = numpy.stack(h5f['x'][idx % num_samples_per_file]).astype(numpy.int64)
+        X = torch.tensor(x_numeric)
+        
+        y = torch.tensor(h5f['y'][idx % num_samples_per_file])
+        imperfect_y_flag = torch.tensor(h5f['imperfect_y_flag'][idx % num_samples_per_file])
+        num_nodes = h5f.attrs['num_nodes']
+
+        data = Data(x=X, edge_index=edge_index, y=y, imperfect_y_flag=imperfect_y_flag, num_nodes=num_nodes)
+
+        return data
