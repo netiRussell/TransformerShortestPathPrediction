@@ -6,6 +6,7 @@ import pandas as pd
 import numpy
 import ast
 import h5py
+import pyarrow.parquet as pq
 
 import sys
 
@@ -20,9 +21,10 @@ class PredictShortestPathDataset(Dataset):
   @property
   def processed_file_names(self):
     # return 'none.pt'
-
-    self.df = pd.read_parquet(self.raw_paths[1])
-    return ['data_{}.h5'.format(i) for i in range(len(self.df)//(2*100)) ]
+    
+    parquet_file = pq.ParquetFile(self.raw_paths[1])
+    num_samples = parquet_file.metadata.num_rows
+    return ['data_{}.h5'.format(i) for i in range(num_samples) ]
     
 
   def download(self):
@@ -81,7 +83,7 @@ class PredictShortestPathDataset(Dataset):
         print(f'data_{idx}.pt generated in {idx // num_samples_per_file}')
 
   def len(self):
-        return len(self.processed_file_names) // 2 # since every 2nd sample is disregarded
+        return len(self.df) // 2 # since every 2nd sample is disregarded
 
   def get(self, idx):
         num_samples_per_file = 100
