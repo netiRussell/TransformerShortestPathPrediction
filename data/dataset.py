@@ -20,11 +20,12 @@ class PredictShortestPathDataset(Dataset):
 
   @property
   def processed_file_names(self):
-    # return 'none.pt'
+    return 'none.pt'
     
     parquet_file = pq.ParquetFile(self.raw_paths[1])
-    num_samples = parquet_file.metadata.num_rows
-    return ['data_{}.h5'.format(i) for i in range(num_samples) ]
+    self.num_samples = parquet_file.metadata.num_rows
+    num_files = self.num_samples // (2*100)
+    return ['data_{}.h5'.format(i) for i in range(num_files) ]
     
 
   def download(self):
@@ -74,16 +75,18 @@ class PredictShortestPathDataset(Dataset):
 
         #Append samples
         row_num = idx % num_samples_per_file
-        x_set[row_num, ...] = torch.tensor(ast.literal_eval(row['X'].decode('utf-8'))).numpy()
-        y_set[row_num, ...] = torch.tensor(ast.literal_eval(row['Y'].decode('utf-8'))[0]).numpy()
-        flag_set[row_num, ...] = torch.tensor([ast.literal_eval(row['Y'].decode('utf-8'))[1]]).numpy()
+        x_set[row_num, ...] = list(ast.literal_eval(row['X'].decode('utf-8')))
+        y_set[row_num, ...] = list(ast.literal_eval(row['Y'].decode('utf-8'))[0])
+        flag_set[row_num, ...] = list([ast.literal_eval(row['Y'].decode('utf-8'))[1]])
 
         idx += 1
         counter += 1
         print(f'data_{idx}.pt generated in {idx // num_samples_per_file}')
+      
+    self.num_samples = len(self.df)
 
   def len(self):
-        return len(self.df) // 2 # since every 2nd sample is disregarded
+        return self.num_samples // 2 # since every 2nd sample is disregarded
 
   def get(self, idx):
         num_samples_per_file = 100

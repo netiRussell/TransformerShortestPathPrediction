@@ -140,6 +140,8 @@ for epoch in range(config['num_epochs']):
     print(f"Epoch: {epoch+1}, Batch: {batch_index}, Loss: {avg_batch_loss}")
   
   # Validate current epoch
+  del trainLoader
+  
   validIter = iter( get_data_subset(dataset, batch_size=config['batch_size'], n_samples=config['num_samples']) )
   validLoss.append(validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ))
 
