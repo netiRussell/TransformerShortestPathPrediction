@@ -31,11 +31,11 @@ print(f'Chosen device for training: {device}')
 # -- Config --
 config = {
   "batch_size": 50,
-  "num_epochs": 6,
+  "num_epochs": 15,
   # TODO: start with bigger one and gradually go down to 10**-4 or some other small number
   "lr": 10**-4,
-  "num_nodes": 100,
-  "num_samples": 12500
+  "num_nodes": 2500,
+  "num_samples": 25000
 }
 
 
@@ -44,15 +44,15 @@ dataset = PredictShortestPathDataset(root="./data")
 
 
 # -- Visualize a single data sample --
-visualizeGraph(dataset, num_nodes=100, run=False)
+visualizeGraph(dataset, num_nodes=2500, run=False)
 
 
 # -- Model & Optimizer & Criterion --
-checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False, device=device )
+checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=1024, num_encoderBlocks=8, num_attnHeads=8, dropout=0.1, d_ff=4096, resume=False, device=device )
 model.to(device)
 
 currTimeStep = 1
-Twarmup = 10 # warmup will take place during the first 10 mini-batches
+Twarmup = 15 # warmup will take place during the first 10 mini-batches
 optimizer = torch.optim.Adam(model.parameters(), lr=config['lr']*currTimeStep/Twarmup, eps=1e-9)
 
 criterion = nn.CrossEntropyLoss(label_smoothing=0.1).to(device)
@@ -83,6 +83,7 @@ edge_set_sample = set(zip(edge_index_sample[0].tolist(), edge_index_sample[1].to
 # Encoder mask
 encoder_mask = generate_enc_mas(num_nodes=config['num_nodes'], edge_set=edge_set_sample).to(device)
 
+# The main loop
 for epoch in range(config['num_epochs']):
   # One epoch
   trainLoader = get_data_subset(dataset, batch_size=config['batch_size'], n_samples=config['num_samples'])
@@ -142,8 +143,11 @@ for epoch in range(config['num_epochs']):
   # Validate current epoch
   del trainLoader
   
-  validIter = iter( get_data_subset(dataset, batch_size=config['batch_size'], n_samples=config['num_samples']) )
+  print("Validation ...")
+  validIter = get_data_subset(dataset, batch_size=50, n_samples=600)
   validLoss.append(validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ))
+  
+  del validIter
 
 
 # -- Save progress of training --
@@ -162,7 +166,7 @@ visualizeLoss([losses, validLoss], run=True)
 
 # -- Evaluation --
 model.eval()
-evalIter = iter( get_eval_subset(dataset, valid_percantage=0.3) )
+evalIter = iter( get_eval_subset(dataset, valid_percantage=0.02) )
 
 with torch.no_grad():
   complete_success_rate = []

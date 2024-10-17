@@ -1,6 +1,15 @@
 # Transformer portion is based on: https://github.com/hkproj/pytorch-transformer/blob/main/model.py
 # Improved and GCN added by Ruslan Abdulin
 
+
+# Current todo:
+    # TODO: Make sure the masks for both encoder and decoder are correct
+    # TODO: Consider utilizing pool layers to reduce the number of layers and increase the coverage.(Diogonally, for 50x50 grid, longest path is 98 GCN hops)
+    # TODO: Consider utilizing different alpha value for GCN2
+
+# Changes 10/11/24: epochs = 25, increasing learning rate to 15 batches instead of 10, additional NN layer for feed forward 
+# d_model=1024(was 512), num_encoderBlocks=8(was 6), d_ff=4096(was 2048)
+
 """
 Logic: graph is considered as whole and GCN2 are applied to it. Then, the resulted matrix goes into Transformer's encoder part where EOS(which is also a SOE = num_nodes) is included with the initial value of num_nodes(src_mask is set up to allow the connection to EOS from any node). Starting with the Decoder's part of the Transformer, the EOS is included.
 """
@@ -40,6 +49,46 @@ class GCNs(nn.Module):
     self.gcn7 = GCN2Conv(1, 0.3)
     self.gcn8 = GCN2Conv(1, 0.3)
     self.gcn9 = GCN2Conv(1, 0.3)
+    self.gcn10 = GCN2Conv(1, 0.3)
+    self.gcn11 = GCN2Conv(1, 0.3)
+    self.gcn12 = GCN2Conv(1, 0.3)
+    self.gcn13 = GCN2Conv(1, 0.3)
+    self.gcn14 = GCN2Conv(1, 0.3)
+    self.gcn15 = GCN2Conv(1, 0.3)
+    self.gcn16 = GCN2Conv(1, 0.3)
+    self.gcn17 = GCN2Conv(1, 0.3)
+    self.gcn18 = GCN2Conv(1, 0.3)
+    self.gcn19 = GCN2Conv(1, 0.3)
+    self.gcn20 = GCN2Conv(1, 0.3)
+    self.gcn21 = GCN2Conv(1, 0.3)
+    self.gcn22 = GCN2Conv(1, 0.3)
+    self.gcn23 = GCN2Conv(1, 0.3)
+    self.gcn24 = GCN2Conv(1, 0.3)
+    self.gcn25 = GCN2Conv(1, 0.3)
+    self.gcn26 = GCN2Conv(1, 0.3)
+    self.gcn27 = GCN2Conv(1, 0.3)
+    self.gcn28 = GCN2Conv(1, 0.3)
+    self.gcn29 = GCN2Conv(1, 0.3)
+    self.gcn30 = GCN2Conv(1, 0.3)
+    self.gcn31 = GCN2Conv(1, 0.3)
+    self.gcn32 = GCN2Conv(1, 0.3)
+    self.gcn33 = GCN2Conv(1, 0.3)
+    self.gcn34 = GCN2Conv(1, 0.3)
+    self.gcn35 = GCN2Conv(1, 0.3)
+    self.gcn36 = GCN2Conv(1, 0.3)
+    self.gcn37 = GCN2Conv(1, 0.3)
+    self.gcn38 = GCN2Conv(1, 0.3)
+    self.gcn39 = GCN2Conv(1, 0.3)
+    self.gcn40 = GCN2Conv(1, 0.3)
+    self.gcn41 = GCN2Conv(1, 0.3)
+    self.gcn42 = GCN2Conv(1, 0.3)
+    self.gcn43 = GCN2Conv(1, 0.3)
+    self.gcn44 = GCN2Conv(1, 0.3)
+    self.gcn45 = GCN2Conv(1, 0.3)
+    self.gcn46 = GCN2Conv(1, 0.3)
+    self.gcn47 = GCN2Conv(1, 0.3)
+    self.gcn48 = GCN2Conv(1, 0.3)
+    self.gcn49 = GCN2Conv(1, 0.3)
 
     self.dropout = nn.Dropout(dropout)
     self.sigmoidNumNod = CustomSigmoid()
@@ -71,7 +120,127 @@ class GCNs(nn.Module):
     out = F.relu(self.gcn8(out, x_0, adj))
     out = self.dropout(out)
 
-    out = self.sigmoidNumNod(self.gcn9(out, x_0, adj))
+    out = F.relu(self.gcn9(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn10(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn11(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.leaky_relu(self.gcn12(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn13(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn14(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = torch.sigmoid((self.gcn15(out, x_0, adj)))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn16(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn17(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn18(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn19(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn20(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn21(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.leaky_relu(self.gcn22(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn23(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn24(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = torch.sigmoid((self.gcn25(out, x_0, adj)))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn26(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn27(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn28(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn29(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn30(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn31(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.leaky_relu(self.gcn32(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn33(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn34(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = torch.sigmoid((self.gcn35(out, x_0, adj)))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn36(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn37(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn38(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn39(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn40(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn41(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.leaky_relu(self.gcn42(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn43(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn44(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = torch.sigmoid((self.gcn45(out, x_0, adj)))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn46(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn47(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = F.relu(self.gcn48(out, x_0, adj))
+    out = self.dropout(out)
+
+    out = self.sigmoidNumNod(self.gcn49(out, x_0, adj))
     out = out.squeeze(1).long()
 
     return out
@@ -143,24 +312,23 @@ class Normalizator(nn.Module):
     return self.alpha * (input - mean) / (std + self.eps) + self.gamma
 
 
-# FeedForwardBlock layer that makes use of two NNs (can be modified/reused for improvement)
+# FeedForwardBlock layer that makes use of three NNs (can be modified/reused for improvement)
 class FeedForwardBlock(nn.Module):
   def __init__( self, d_model: int, d_ff: int, dropout: float ):
     super().__init__()
     self.linear1 = nn.Linear(d_model, d_ff) # In the paper: W1, B1
+    self.linear2 = nn.Linear(d_ff, d_ff) # In the paper: W2, B2=d_model but it is = d_ff in this GTN 
+    self.linear3 = nn.Linear(d_ff, d_model) # Additional NN layer
     self.dropout = nn.Dropout(dropout)
-    self.linear2 = nn.Linear(d_ff, d_model) # In the paper: W2, B2
   
   def forward( self, input):
     # input: (batch, max_path_len, d_model) --> (batch, max_path_len, d_ff) --> (batch, max_path_len, d_model)
     # Formula from the paper
-    return self.linear2(self.dropout(torch.relu(self.linear1(input))))
+    formula = self.linear2(self.dropout(torch.relu(self.linear1(input))))
+    return self.linear3(self.dropout(formula))
 
 
 # ! num_heads = h
-# MultiHeadAttentionBlock calculates relations between elements in a sequence
-# TODO: consider step softmax(...), in ... we calculate matrix that allows us to omit(mask) relations between some elements. Check if it is possible to write matrix that utilizes this omit-feature based on the given adjacency matrix. If it is possible, then implement one. This way, I would have a matrix that prevents jumping from node A to node B that is not directly connected to node A.
-  # https://www.youtube.com/watch?v=ISNdQcPhsts @ minute 29
 class MultiHeadAttentionBlock(nn.Module):
   def __init__( self, d_model: int, num_heads: int, dropout: float ):
     super().__init__()
@@ -298,11 +466,7 @@ class DecoderBlock(nn.Module):
     # Self Attentions for the tgt_input; with target mask
     tgt_output = self.resid_cons[0](tgt_input, lambda tgt_input: self.self_attention_block( tgt_input, tgt_input, tgt_input, None ))
 
-    # TODO: Cross Attentions must use a specific mask that would provide values from src_mask that correspond each index from the tgt_input
-    # TODO: For decoder and cross attention masks - include EOS. All elems except the last one must not have access to EOS. Cross attentions is the same one as src_mask but with corresponding values (eg. node 2 must have values from src_mask[2][:] applied), also keep EOS open to every element.
-
-    # Prepare mask for the Cross Attentions
-    # Cross Attentions for values, keys as Encoder output and queries as the decoder block output; with source mask
+    # Cross Attentions for values, keys as Encoder output and queries as the decoder block output; with cross mask
     tgt_output = self.resid_cons[1](tgt_output, lambda tgt_output: self.cross_attention_block( tgt_output, encoder_output, encoder_output, cross_mask ))
 
     # Feed Forward
@@ -379,7 +543,10 @@ class Transformer(nn.Module):
       tgt_input = torch.tensor([eos]).to(self.device)
 
     # Initializing a tensor that will hold predictions [curr_seq_length, num_nodes+1]
-    finalOut = torch.tensor([]).to(self.device)
+    finalOut = []
+    
+    # Initializing a tensor that will holds cross_mask values
+    cross_mask = torch.empty(0).to(self.device)
 
     # The main Loop
     for step in range(1, max_path_len):
@@ -390,29 +557,16 @@ class Transformer(nn.Module):
       out = self.tgt_pos(out)
 
       # Prepare current Cross-Attention mask
-      # Initial value = [[EOS]]
-      cross_mask = src_mask[-1].unsqueeze(0)
-
-      if(training_mode == True):
-        # Training, check on step of the training
-        current_tgt_input = tgt_input[1:step]
-
-        for elem in current_tgt_input:
-          cross_mask = torch.cat(( cross_mask, src_mask[elem.item()].unsqueeze(0) ))
-
-      else:
-        # Regular mode - Eval
-        for elem in tgt_input[1:]:
-          cross_mask = torch.cat(( cross_mask, src_mask[elem.item()].unsqueeze(0) ))
+      # cross_mask[step-1] = src_mask[tgt_input[step-1].item()]
+      cross_mask = torch.cat(( cross_mask, src_mask[tgt_input[step-1].item()].unsqueeze(0) ))
       
-
       # Decoder forward pass
       out = self.decoder(out, encoder_output, cross_mask, step, training_mode)
       out = self.project(out)
       nextNode = torch.argmax(out[step-1]).to(self.device)
 
       # Append next node to the final list of steps predicted
-      finalOut = torch.cat((finalOut, out[step-1].unsqueeze(0)))
+      finalOut.append(out[step-1])
 
       if(training_mode == True):
         # Teacher Forcing, to be deleted after training
@@ -420,21 +574,29 @@ class Transformer(nn.Module):
           # Delete EOS from the beginning the prediction
           tgt_input = tgt_input[1:]
           
-          return tgt_input, finalOut
+          del cross_mask
+          return tgt_input, torch.stack(finalOut, dim=0)
       else:
         # Update decoder input
         tgt_input = torch.cat((tgt_input, nextNode.unsqueeze(0)))
         
-      
+        
       # If EOS is reached => end of sequence => end the loop.
       if( nextNode == eos and training_mode == False ):
         # Delete EOS from the beginning and the end of the prediction
         tgt_input = tgt_input[1:-1]
-        return tgt_input, finalOut
+        
+        del cross_mask
+        return tgt_input, torch.stack(finalOut, dim=0)
+    
 
     # Delete EOS from the beginning the prediction
     tgt_input = tgt_input[1:]
-    return tgt_input, finalOut
+    
+    del cross_mask
+    return tgt_input, torch.stack(finalOut, dim=0)
+  
+    
   
   def project( self, input ):
     # Final linear NN

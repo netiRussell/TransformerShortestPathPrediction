@@ -20,12 +20,11 @@ class PredictShortestPathDataset(Dataset):
 
   @property
   def processed_file_names(self):
-    return 'none.pt'
+    #return 'none.pt'
     
     parquet_file = pq.ParquetFile(self.raw_paths[1])
     self.num_samples = parquet_file.metadata.num_rows
-    num_files = self.num_samples // (2*100)
-    return ['data_{}.h5'.format(i) for i in range(num_files) ]
+    return ['data_{}.h5'.format(i) for i in range(self.num_samples // (2*100)) ]
     
 
   def download(self):
@@ -82,13 +81,17 @@ class PredictShortestPathDataset(Dataset):
         idx += 1
         counter += 1
         print(f'data_{idx}.pt generated in {idx // num_samples_per_file}')
-      
+        # print(row['Y'])
+        # print(list(ast.literal_eval(row['Y'].decode('utf-8'))[0]))
+
+    
     self.num_samples = len(self.df)
 
   def len(self):
-        return self.num_samples // 2 # since every 2nd sample is disregarded
+        return self.num_samples//2 # since every 2nd sample is disregarded
 
   def get(self, idx):
+        # print("IDX: ", idx)
         num_samples_per_file = 100
 
         h5_file_path = osp.join(self.processed_dir, 'edge_index.h5')
@@ -108,3 +111,27 @@ class PredictShortestPathDataset(Dataset):
         data = Data(x=X, edge_index=edge_index, y=y, imperfect_y_flag=imperfect_y_flag, num_nodes=num_nodes)
 
         return data
+
+
+"""
+idx = 51898
+h5_file_path = osp.join("./processed/", f'data_{idx // 100}.h5')
+h5f = h5py.File(h5_file_path, 'r')
+
+#51819-51899
+print(f"File: {idx // 100}")
+x_numeric = numpy.stack(h5f['x'][idx % 100]).astype(numpy.int64)
+X = torch.tensor(x_numeric)
+print(X)
+"""
+
+
+
+
+
+
+
+
+
+
+
