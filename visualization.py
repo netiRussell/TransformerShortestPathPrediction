@@ -34,8 +34,8 @@ def visualizeLoss(losses, run):
   plt1.grid()
 
   plt2.plot(range(1, len(losses[1]) + 1), losses[1], marker='o')
-  plt2.set_title('Validation per batch')
-  plt2.set_xlabel('Batch')
+  plt2.set_title('Validation per epoch')
+  plt2.set_xlabel('Epoch')
   plt2.set_ylabel('Percantage')
   plt2.grid()
 

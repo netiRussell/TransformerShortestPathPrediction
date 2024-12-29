@@ -8,6 +8,9 @@ from data.dataset import PredictShortestPathDataset
 from functions import get_data_subset, get_eval_subset, save_checkpoint, is_correct, generate_enc_mas, validate_curr_epoch
 
 
+# TODO: try deeper model for 15 epochs
+# TODO: if doesn't work try 80% dataset for 10x10 grids
+
 
 import sys # TODO: delete after done with development
 
@@ -31,7 +34,7 @@ print(f'Chosen device for training: {device}')
 # -- Config --
 config = {
   "batch_size": 50,
-  "num_epochs": 15,
+  "num_epochs": 30,
   # TODO: start with bigger one and gradually go down to 10**-4 or some other small number
   "lr": 10**-4,
   "num_nodes": 2500,
@@ -48,7 +51,8 @@ visualizeGraph(dataset, num_nodes=2500, run=False)
 
 
 # -- Model & Optimizer & Criterion --
-checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=1024, num_encoderBlocks=8, num_attnHeads=8, dropout=0.1, d_ff=4096, resume=False, device=device )
+# Modifications 10/24/24: d_model=774(was 512), num_encoderBlocks=7(was 6), num_attnHeads=9(was 8), d_ff=3072(was 2048), epoch size = 25000(was 12500)
+checkpoint, model = transformer_builder( max_src_len=config['num_nodes']+1, max_tgt_len=config['num_nodes']+1, d_model=512, num_encoderBlocks=6, num_attnHeads=8, dropout=0.1, d_ff=2048, resume=False, device=device )
 model.to(device)
 
 currTimeStep = 1
@@ -83,7 +87,6 @@ edge_set_sample = set(zip(edge_index_sample[0].tolist(), edge_index_sample[1].to
 # Encoder mask
 encoder_mask = generate_enc_mas(num_nodes=config['num_nodes'], edge_set=edge_set_sample).to(device)
 
-# The main loop
 for epoch in range(config['num_epochs']):
   # One epoch
   trainLoader = get_data_subset(dataset, batch_size=config['batch_size'], n_samples=config['num_samples'])
@@ -141,13 +144,11 @@ for epoch in range(config['num_epochs']):
     print(f"Epoch: {epoch+1}, Batch: {batch_index}, Loss: {avg_batch_loss}")
   
   # Validate current epoch
-  del trainLoader
+  del trainLoader 
   
-  print("Validation ...")
-  validIter = get_data_subset(dataset, batch_size=50, n_samples=600)
-  validLoss.append(validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ))
-  
-  del validIter
+  #validIter = iter( get_data_subset(dataset, batch_size=250, n_samples=config['num_samples']) )
+  #validLoss.append(validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ))
+  #del validIter
 
 
 # -- Save progress of training --
@@ -166,7 +167,7 @@ visualizeLoss([losses, validLoss], run=True)
 
 # -- Evaluation --
 model.eval()
-evalIter = iter( get_eval_subset(dataset, valid_percantage=0.02) )
+evalIter = iter( get_eval_subset(dataset, valid_percantage=0.005) )
 
 with torch.no_grad():
   complete_success_rate = []

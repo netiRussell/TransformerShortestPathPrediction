@@ -26,7 +26,7 @@ def get_data_subset(dataset, batch_size, n_samples):
 def get_eval_subset(dataset, valid_percantage):
   sampler = RandomSampler(dataset, num_samples=int(len(dataset)*valid_percantage))
   validLoader = DataLoader(dataset, batch_size=100, shuffle=False, sampler=sampler)
-  
+
   return validLoader
 
 
@@ -77,8 +77,7 @@ def generate_enc_mas(num_nodes, edge_set):
                 tmp_mask[consideredNode][otherNode] = 1
     
     # EOS case
-    initial_value_cm = list(1 for _ in range(num_nodes))
-    initial_value_cm.append(0)
+    initial_value_cm = list(1 for _ in range(num_nodes+1))
     tmp_mask[-1] = torch.tensor(initial_value_cm)
 
     return tmp_mask
@@ -88,28 +87,29 @@ def generate_enc_mas(num_nodes, edge_set):
 def validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, encoder_mask, config, device ):
     model.eval()
     with torch.no_grad():
-        # Get the next validation / evaluation batch
-        for batch in validIter:
+        try:
+            # Get the next validation / evaluation batch
+            batch = next(validIter)
+
             complete_success_rate = []
-            print(f"Length of the current val. batch: {len(batch)}")
-    
+
             for i in range(len(batch)):
+                print(f"{i}: Prediction generated")
                 # Imperfect sample; to be disregarded
                 # y_flag = batch[i].imperfect_y_flag.item()
                 # if( y_flag == 1 ):
                 #   continue
-    
+
                 # X
                 encoder_input = batch[i].x.to(device)
                 # Edge Index list
                 adj_input = edge_index_sample
                 # y
                 label = batch[i].y.to(device)
-    
+
                 # Generate prediction (we're interested in steps, not the probs)
                 prediction, _ = model( encoder_input, None, adj_input, encoder_mask, config['num_nodes']+1)
-                print(f"{i}: Prediction generated")
-    
+
                 # Check if the length of the output is correct
                 if(len(label) != len(prediction)):
                     complete_success_rate.append(0)
@@ -117,10 +117,14 @@ def validate_curr_epoch( validIter, edge_index_sample, edge_set_sample, model, e
                 
                 # Check if all the nodes are correct and src and dest are correct
                 complete_success_rate.append( is_correct(encoder_input, edge_set_sample, prediction) )
+            
+            loss = (sum(complete_success_rate) / len(complete_success_rate))*100
+            print(f"Current validation percantage: {loss}%")
+
+            model.train()
+            return loss
         
-        loss = (sum(complete_success_rate) / len(complete_success_rate))*100
-        print(f"Current validation percantage: {loss}%")
-
-        model.train()
-        return loss
-
+        except StopIteration:
+            # Avoid raising StopIteration
+            model.train()
+            print("No more untouched data for valid/eval left")

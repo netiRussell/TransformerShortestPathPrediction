@@ -1,1 +1,0 @@
-This directory is where saved weights are stored
