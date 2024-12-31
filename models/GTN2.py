@@ -450,21 +450,9 @@ class DecoderBlock(nn.Module):
     self.resid_cons = nn.ModuleList([ResidualConnector(dropout), ResidualConnector(dropout), ResidualConnector(dropout)])
   
   def forward( self, tgt_input, encoder_output, cross_mask, training_step, training_mode):
-    # Check if is in the training mode
-    if training_mode is True:
-      # Make sure tgt_input(the label) is masked during the cross attentions part as well
-      tgt_input = tgt_input[:training_step, :]
-
     # Self Attentions for the tgt_input; with target mask
-    #print("~~", cross_mask.shape)
-    #print("~~", tgt_input.shape)
+    # !!!! TODO: MASK IS HERE !!!! ------------------------------------------------------
     tgt_output = self.resid_cons[0](tgt_input, lambda tgt_input: self.self_attention_block( tgt_input, tgt_input, tgt_input, None ))
-    """
-    tgt_input mask shows access between a single node to all nodes present in the tgt_input
-    For example: tgt_input has nodes [1, 2, 3]. the mask must be of size 3x3: [[], [], []] where each
-    inner [] shows access to all nodes from this particular one. 
-    [[], [0, 0, 1], []] shows that the second node is connected only to the third one.
-    """
 
     # TODO: Cross Attentions must use a specific mask that would provide values from src_mask that correspond each index from the tgt_input
     # TODO: For decoder and cross attention masks - include EOS. All elems except the last one must not have access to EOS. Cross attentions is the same one as src_mask but with corresponding values (eg. node 2 must have values from src_mask[2][:] applied), also keep EOS open to every element.
@@ -485,9 +473,25 @@ class Decoder(nn.Module):
     self.layers = layers
     self.norm = Normalizator()
   
-  def forward( self, tgt_input, encoder_output, cross_mask, training_step, training_mode ):
-    current_tgt_output = tgt_input
-
+  def forward( self, current_tgt_output, encoder_output, cross_mask, training_step, training_mode, input_ids ):
+    # Check if is in the training mode(Teacher forcing)
+    if training_mode is True:
+      # Make sure tgt_input(the label) is masked during the cross attentions part as well
+      current_tgt_output = current_tgt_output[:training_step, :]
+    
+    # Generating a mask for self-attention
+    self_mask = torch.empty(training_step, training_step)
+    for i, _ in enumerate(input_ids):
+        for k, considered_elem in enumerate(input_ids):
+            self_mask[i][k] = cross_mask[i][considered_elem]
+    
+    """
+    tgt_input mask shows access between a single node to all nodes present in the tgt_input
+    For example: tgt_input has nodes [1, 2, 3]. the mask must be of size 3x3: [[], [], []] where each
+    inner [] shows access to all nodes from this particular one. 
+    [[], [0, 0, 1], []] shows that the second node is connected only to the third one.
+    """
+    
     # Sequentially send input through every given DecoderBlock with the same mask
     for layer in self.layers:
       current_tgt_output = layer(current_tgt_output, encoder_output, cross_mask, training_step, training_mode)
@@ -555,7 +559,6 @@ class Transformer(nn.Module):
 
     # The main Loop
     for step in range(1, max_path_len):
-
       out = self.tgt_embedding(tgt_input)
       out = self.tgt_pos(out)
 
@@ -563,7 +566,7 @@ class Transformer(nn.Module):
       cross_mask = torch.cat(( cross_mask, src_mask[tgt_input[step-1].item()].unsqueeze(0) ))
 
       # Decoder forward pass
-      out = self.decoder(out, encoder_output, cross_mask, step, training_mode)
+      out = self.decoder(out, encoder_output, cross_mask, step, training_mode, tgt_input[:step])
       out = self.project(out)
       nextNode = torch.argmax(out[step-1]).to(self.device)
 

@@ -4,3 +4,4 @@ data/__pycache__
 __pycache__
 savedGrads/checkpoint.pth.tar
 .DS_Store
+savedGrads/50x50_Deep_98accr.tar
